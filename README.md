@@ -36,7 +36,7 @@ DDG, or Directory Driven Gallery, is a dynamic web application designed to creat
 
 ### 1. Clone this repository
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/incama/DDG.git
 cd <your-repo-folder>
 ```
 
