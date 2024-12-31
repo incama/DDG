@@ -1,0 +1,167 @@
+body {
+    margin: 0;
+    padding: 0;
+    font-size: 100%;
+    font-family: "Bebas Neue";
+    background: #42474B;
+    color: darkgray;
+}
+/* START GRID DEFINITION */
+.container {
+    display: grid;
+    grid-template-columns: 370px;
+    grid-template-rows: 1fr;
+    gap: 0px 0px;
+    grid-auto-flow: row;
+    grid-template-areas:
+    "left-column content content";
+}
+.header {
+    background: #42474B;
+    height: 100px;
+}
+
+
+.clear {clear: both;}
+.bread {
+    grid-area: bread;
+    background: #81847D;
+    padding: 10px 5px 5px 370px;
+    color: #42474B;
+}
+.bread p {
+    font-size: 20px;
+}
+.breadcrumb {
+    padding: 5px;
+}
+.breadcrumb a {
+    text-decoration: none;
+    margin-right: 5px;
+    color: #a8d9ff;
+}
+.breadcrumb a:hover {
+    text-decoration: underline;
+}
+.left-column {
+    grid-area: left-column;
+    background: #81847D;
+    padding: 5px;
+}
+.content {
+    grid-area: content;
+    background: #BAC1B9;
+    padding: 5px;
+}
+.footer {
+    background: #81847D;
+    text-align: center;
+    padding: 10px;
+}
+h1#title {
+    position: fixed;
+    left: 0px;
+    top: 0px;
+    padding: 0px 10px 10px 10px;
+    width: 250px;
+}
+
+h2.content_header {
+    padding: 10px;
+    color: #42474B;
+}
+p {
+}
+
+.centered {
+    text-align: center;
+}
+.footer p.centered {
+    color: #BAC1B9;
+    padding-top: 10px;
+}
+div.left-box-title {
+    border-bottom: 1px solid #BAC1B9;
+}
+div.right-box-title {
+    border-bottom: 1px solid #81847D;
+}
+.folders, .files {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+.folder, .file {
+    margin: 10px;
+    text-align: center;
+}
+.folder {
+    width: 100px;
+    height: 135px;
+    margin-bottom: 10px;
+    padding-top: 10px;
+    border: 1px solid #656862;
+    background: #BAC1B9;
+}
+.folder img {
+    width: 100px;
+    height: 100px;
+    margin-bottom: 10px;
+    background: #BAC1B9;
+}
+.file img {
+    max-width: 200px;
+    height: auto;
+}
+.folder_name {
+    font-size: 12px;
+    position: relative;
+    top: -7px;
+    bottom: 0px;
+    color: #42474B;
+}
+.images, .files {
+    display: flex;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+.image, .file {
+    margin: 10px;
+    text-align: center;
+}
+.image {
+    width: 300px;
+    height: 198px;
+    margin-bottom: 10px;
+    background: #BAC1B9;
+}
+.image img {
+    border-radius: 5px;
+}
+.image_name {
+    font-size: 14px;
+    font-weight: bold;
+    position: 100px;
+    bottom: 0px;
+    color: #42474B;
+}
+.cleanup-button-container {
+    position: fixed;
+    right: 10px;
+    top: 10px;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.cleanup-button {
+    background-color: #ff4d4d;
+    color: white;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.cleanup-button:hover {
+    background-color: #ff3333;
+}
