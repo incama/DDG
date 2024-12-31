@@ -3,11 +3,12 @@ import random
 import subprocess
 import hashlib
 from flask import Flask, render_template, url_for, send_from_directory, request
-from PIL import Image, ImageOps
+from PIL import Image, ImageOps, ImageFile
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
 BASE_DIR = "gallery"
 THUMBNAIL_DIR = "static/thumbnails"
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 os.makedirs(THUMBNAIL_DIR, exist_ok=True)  # Ensure thumbnails dir exists
 
 def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
