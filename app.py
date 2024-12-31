@@ -1,8 +1,7 @@
 import os
 import random
 import subprocess
-import hashlib
-from flask import Flask, render_template, url_for, send_from_directory, request
+from flask import Flask, render_template, url_for, send_from_directory
 from PIL import Image, ImageOps, ImageFile
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
