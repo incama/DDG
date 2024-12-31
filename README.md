@@ -115,7 +115,7 @@ To deploy the app on a production server:
 
 Future features planned for DDG include:
 - Pagination for large directories.
-- User authentication for private galleries/sharing.
+- ~~User authentication for private galleries/sharing~~. (not any time soon!)
 - Drag-and-drop file uploads via web UI.
 - Custom themes for enhanced visual design.
 
