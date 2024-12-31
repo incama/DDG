@@ -2,6 +2,8 @@
 
 DDG, or Directory Driven Gallery, is a dynamic web application designed to create a visual gallery structure powered by the file system. It automatically generates image and video thumbnails, showcases folder layouts, and enables efficient navigation within a gallery-like interface by leveraging the directory structure.
 
+![DDG](/screenshots/screenshot-01.png?raw=true "DDG")
+
 ---
 
 ## Features
