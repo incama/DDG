@@ -64,6 +64,7 @@ If your system doesn’t already have FFmpeg:
 ### 1. Prepare Your Gallery
 - Create a folder named `gallery` in the root of the project.
 - Populate the `gallery` folder with subdirectories, images (`.jpg`, `.jpeg`, `.png`, etc.), and videos (`.mp4`, `.avi`, `.mov`, etc.).
+- When adding new images you don't have to restart the app, just refresh your browser, DDG will take care of everthing!
 
 Folder structure example:
 ````
