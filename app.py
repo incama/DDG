@@ -1,102 +1,58 @@
 import os
 import random
 import subprocess
-from flask import Flask, render_template, url_for, send_from_directory, request
-from PIL import Image, ImageOps, ImageFile
+from flask import Flask, render_template, url_for, send_from_directory, abort
+from PIL import Image, ImageFile
+from pathlib import Path
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
-BASE_DIR = "gallery"
-THUMBNAIL_DIR = "static/thumbnails"
+BASE_DIR = Path("gallery").resolve()
+THUMBNAIL_DIR = Path(app.static_folder) / "thumbnails"
 ImageFile.LOAD_TRUNCATED_IMAGES = True
-os.makedirs(THUMBNAIL_DIR, exist_ok=True)  # Ensure thumbnails dir exists
+THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
 
 def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
-    """
-    Recreate the folder structure of the gallery inside the thumbnail directory.
-
-    Parameters:
-    - file_path (str): The full path to the original file (image/video).
-    - base_dir (str): The base directory of the gallery.
-    - thumbnail_dir (str): The base directory for the thumbnails.
-
-    Returns:
-    - str: The full path to the thumbnail file.
-    """
-    # Get the relative path from the gallery base directory
-    relative_path = os.path.relpath(file_path, base_dir)
-
-    # Create corresponding paths in the thumbnail directory
-    thumbnail_path = os.path.join(thumbnail_dir, relative_path)
-
-    # Ensure the parent directory for the thumbnail exists
-    os.makedirs(os.path.dirname(thumbnail_path), exist_ok=True)
-
-    return thumbnail_path.replace("\\", "/")
+    relative_path = Path(file_path).relative_to(Path(base_dir))
+    thumbnail_path = Path(thumbnail_dir) / relative_path
+    Path(thumbnail_path).parent.mkdir(parents=True, exist_ok=True)
+    return thumbnail_path.as_posix()
 
 def generate_thumbnail(file_path, thumbnail_path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
-    """
-    Generate a uniform square thumbnail for an image without distorting the aspect ratio.
-
-    Parameters:
-    - file_path (str): The path to the original image file.
-    - thumbnail_path (str): Path to save the resulting thumbnail.
-    - size (tuple): Desired thumbnail size (width, height); default is (200, 200).
-
-    Returns:
-    - None
-    """
+    file_path = Path(file_path)
     try:
         with Image.open(file_path) as img:
-            # Fix orientation based on EXIF metadata
-            img = ImageOps.exif_transpose(img)
-
-            # Preserve aspect ratio and fit image within the square area
             img.thumbnail(size, Image.Resampling.LANCZOS)
-
-            # Create a new square image with the specified background color
-            square_thumbnail = Image.new("RGB", size, background_color)
-
-            # Calculate coordinates to center the image on the canvas
-            offset_x = (size[0] - img.width) // 2
-            offset_y = (size[1] - img.height) // 2
-            square_thumbnail.paste(img, (offset_x, offset_y))
-
-            # Save the resulting thumbnail
-            square_thumbnail.save(thumbnail_path)
-            print(f"Thumbnail with padding saved at {thumbnail_path}")
-    except Exception as e:
-        print(f"Error generating padded thumbnail for {file_path}: {e}")
+            thumb = Image.new("RGB", size, background_color)
+            thumb.paste(img, (int((size[0] - img.size[0]) / 2), int((size[1] - img.size[1]) / 2)))
+            thumb.save(thumbnail_path, "JPEG", quality=quality)
+            print(f"Thumbnail for {file_path} saved at {thumbnail_path}")
+    except (FileNotFoundError, OSError) as e:
+        print(f"Error generating thumbnail for {file_path}: {e}")
 
 def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timestamp="00:00:01"):
-    """
-    Generate a thumbnail for a video file using FFmpeg and resize it to the given size.
-
-    Parameters:
-    - video_path (str): The path to the video file.
-    - thumbnail_path (str): The path where the generated thumbnail will be saved.
-    - size (tuple): The size of the thumbnail (width, height).
-    - timestamp (str): The timestamp for the frame to extract (default is the 1-second mark).
-
-    Returns:
-    - str: The path to the generated thumbnail or None if an error occurred.
-    """
     try:
-        # Use FFmpeg to extract a frame at the specified timestamp
-        extracted_frame_path = thumbnail_path.replace('.jpg', '_raw.jpg')
+        extracted_frame_path = Path(thumbnail_path).with_suffix('_raw.jpg')
         subprocess.run(
             [
                 "ffmpeg",
-                "-i", video_path,  # Input video file
+                "-i", str(video_path),  # Input video file
                 "-ss", timestamp,  # Timestamp for the frame
                 "-vframes", "1",  # Extract only one frame
-                extracted_frame_path,  # Path to save the extracted frame
+                str(extracted_frame_path),  # Path to save the extracted frame
             ],
             stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL  # Suppress FFmpeg output
+            stderr=subprocess.DEVNULL
         )
 
-        # Check if the frame was successfully extracted
-        if not os.path.exists(extracted_frame_path):
+        # Validate FFmpeg availability
+        if subprocess.run(["which", "ffmpeg"], capture_output=True).returncode != 0:
+            raise EnvironmentError("FFmpeg is not available on this system.")
+        with Image.open(extracted_frame_path) as img:
+            pass  # Add logic to handle the image
+    except (FileNotFoundError, OSError, EnvironmentError) as e:
+        print(f"Error generating video thumbnail for {video_path}: {e}")
+
+        if not extracted_frame_path.exists():
             print(f"Error extracting frame from video {video_path}")
             return None
 
@@ -115,124 +71,107 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timest
         print(f"Error generating video thumbnail for {video_path}: {e}")
         return None
 
-def get_random_preview(folder_path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
-    """
-    Get a random image from a folder and generate a uniform thumbnail as a preview.
-
-    Parameters:
-    - folder_path (str): Path to the folder containing images.
-    - size (tuple): Thumbnail size (default: 300x300).
-    - quality (int): JPEG output quality (default: 95).
-    - background_color (tuple): Background color for padding (default: black).
-
-    Returns:
-    - str: The relative path to the generated thumbnail.
-    """
-    try:
-        if not os.path.exists(folder_path):
-            print(f"Folder {folder_path} does not exist.")
-            return url_for("static", filename="default_folder_thumb.png")
-
-        # Gather all valid image files in the folder
-        files = [
-            os.path.join(folder_path, file)
-            for file in os.listdir(folder_path)
-            if os.path.splitext(file)[1].lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp"]
-        ]
-
-        if not files:
-            return url_for("static", filename="default_folder_thumb.png")
-
-        # Randomly select an image for preview
-        selected_image = random.choice(files)
-
-        # Generate a thumbnail path
-        thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
-        thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
-
-        # Generate the thumbnail if it doesn't already exist
-        if not os.path.exists(thumbnail_path):
-            generate_thumbnail(selected_image, thumbnail_path, size=size, quality=quality,
-                               background_color=background_color)
-
-        # Return the relative thumbnail path for URLs
-        return f"/static/{os.path.relpath(thumbnail_path, 'static').replace('\\', '/')}"
-
-    except Exception as e:
-        print(f"Error generating preview for folder {folder_path}: {e}")
+def get_random_preview(folder_path: Path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
+    folder_path = Path(folder_path)
+    if not folder_path.exists():
+        print(f"Folder {folder_path} does not exist.")
         return url_for("static", filename="default_folder_thumb.png")
 
-def cleanup_thumbnails(base_dir, thumbnail_dir):
-    """
-    Remove thumbnails of folders that are no longer present in the gallery.
+    # Gather all valid image files in the folder
+    files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp"]]
+    print(f"Found files in folder {folder_path}: {files}")
 
-    Parameters:
-    - base_dir (str): Path to the base gallery directory.
-    - thumbnail_dir (str): Path to the directory containing thumbnails.
+    # Check if there are no valid image files
+    if not files:
+        fallback = THUMBNAIL_DIR / "default_folder_thumb.png"
+        if not fallback.exists():
+            fallback.touch()  # Create an empty fallback file if it doesn't exist
+        return url_for("static", filename="default_folder_thumb.png")
 
-    Returns:
-    - None
-    """
+    # Randomly select an image for preview
+    selected_image = random.choice(files)
+    print(f"Selected image for thumbnail: {selected_image}")
+
+    # Generate a thumbnail path
+    thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
+    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
+
+    # Generate the thumbnail if it doesn't already exist
+    if not Path(thumbnail_path).exists():
+        print(f"Thumbnail not found, generating: {thumbnail_path}")
+        generate_thumbnail(
+            selected_image,
+            thumbnail_path,
+            size=size,
+            quality=quality,
+            background_color=background_color,
+        )
+
+    # Return the relative thumbnail path for URLs
+    relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
+    print(f"Generated relative URL for thumbnail: {relative_url}")
+    return url_for("static", filename=relative_url)
+
+def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
     try:
-        # Ensure the thumbnail directory exists
-        if not os.path.exists(thumbnail_dir):
+        thumbnail_dir = Path(thumbnail_dir).resolve()
+        base_dir = Path(base_dir).resolve()
+        if not thumbnail_dir.exists():
             print(f"Thumbnail directory {thumbnail_dir} does not exist.")
-            return
+        for item in sorted(thumbnail_dir.rglob("*")):
+            if item.is_dir():
+                corresponding_path = Path(base_dir) / item.relative_to(Path(thumbnail_dir))
+                if not corresponding_path.exists():
+                    print(f"Removing directory: {item}")
+                    item.rmdir()
+            elif item.is_file():
+                corresponding_path = Path(base_dir) / item.relative_to(Path(thumbnail_dir))
+                if not corresponding_path.parent.exists():
+                    print(f"Removing file: {item}")
+                    item.unlink()
 
-        # Traverse the thumbnail directory
-        for root, dirs, files in os.walk(thumbnail_dir, topdown=False):
-            # Check for corresponding folders in the base directory
+        # Traverse the directory structure of thumbnails
+        for root, dirs, files in os.walk(thumbnail_dir):
             for folder in dirs:
-                original_folder_path = os.path.join(base_dir,
-                                                    os.path.relpath(os.path.join(root, folder), thumbnail_dir))
+                original_folder_path = os.path.join(base_dir, os.path.relpath(os.path.join(root, folder), Path(thumbnail_dir)))
                 thumbnail_folder_path = os.path.join(root, folder)
 
                 # If the original folder does not exist, remove its thumbnail folder
                 if not os.path.exists(original_folder_path):
                     print(f"Removing unused thumbnail folder: {thumbnail_folder_path}")
-                    os.rmdir(thumbnail_folder_path)  # Remove empty folder
+                    try:
+                        os.rmdir(thumbnail_folder_path)  # Remove empty folder
+                        print(f"Removed {thumbnail_folder_path}")
+                    except OSError as e:
+                        print(f"Failed to remove {thumbnail_folder_path}: {e}")
 
             # Delete unused thumbnail files
             for file in files:
                 thumbnail_file_path = os.path.join(root, file)
-                original_file_path = os.path.join(base_dir, os.path.relpath(thumbnail_file_path, thumbnail_dir))
+                original_file_path = os.path.join(base_dir, os.path.relpath(thumbnail_file_path, Path(thumbnail_dir)))
 
                 if not os.path.exists(os.path.dirname(original_file_path)):
                     print(f"Removing unused thumbnail file: {thumbnail_file_path}")
-                    os.remove(thumbnail_file_path)
+                    try:
+                        os.remove(thumbnail_file_path)
+                        print(f"Removed {thumbnail_file_path}")
+                    except OSError as e:
+                        print(f"Failed to remove {thumbnail_file_path}: {e}")
 
     except Exception as e:
+        import traceback
         print(f"Error during thumbnail cleanup: {e}")
+        traceback.print_exc()
 
-def count_images_in_directory(folder_path):
-    """
-    Count how many photos (images) are contained within a directory.
-
-    Parameters:
-    - folder_path (str): Path to the directory to scan.
-
-    Returns:
-    - int: Number of image files in the directory.
-    """
+def count_images_in_directory(folder_path: Path):
+    folder_path = Path(folder_path).resolve()
+    print(f"Resolved folder path: {folder_path}")
+    if not folder_path.exists():
+        print(f"Folder {folder_path} does not exist.")
+    print(f"Counting images in folder: {folder_path}")
     try:
-        # Ensure the folder exists
-        if not os.path.exists(folder_path):
-            print(f"Folder {folder_path} does not exist.")
-            return 0
-
-        # List all files in the folder
-        files = os.listdir(folder_path)
-
-        # Filter out files to count only images
-        image_extensions = {".jpg", ".jpeg", ".png", ".gif", ".bmp", ".webp"}
-        images = [
-            file for file in files
-            if os.path.splitext(file)[1].lower() in image_extensions
-        ]
-
-        # Return the count of images
-        return len(images)
-
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        return sum(1 for f in folder_path.glob("*") if f.suffix.lower() in image_extensions)
     except Exception as e:
         print(f"Error counting images in directory {folder_path}: {e}")
         return 0
@@ -242,17 +181,21 @@ def get_folder_content(current_path):
     print(f"Scanning: {current_path}")
     content = {"folders": [], "files": []}
 
-    if os.path.exists(current_path):
+    current_path = Path(current_path)
+    if current_path.exists():
         for entry in sorted(os.listdir(current_path)):
             entry_path = os.path.join(current_path, entry)
 
             # Process folders
             if os.path.isdir(entry_path):
                 preview = get_random_preview(entry_path)
+                print(f"Folder preview for {entry_path}: {preview}")
                 content["folders"].append({
+                    "preview": preview,
                     "name": entry,
-                    "preview": preview
                 })
+                print(f"Adding folder to content: {entry}")
+
 
             # Process files
             elif os.path.isfile(entry_path):
@@ -261,37 +204,40 @@ def get_folder_content(current_path):
                 # For images
                 if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
                     # Generate the thumbnail path and normalize it for URLs
-                    thumbnail_path = recreate_folder_structure(entry_path, BASE_DIR, THUMBNAIL_DIR)
+                    thumbnail_path = recreate_folder_structure(Path(entry_path), BASE_DIR, THUMBNAIL_DIR)
                     thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
 
                     if not os.path.exists(thumbnail_path):
-                        generate_thumbnail(entry_path, thumbnail_path)
+                        generate_thumbnail(Path(entry_path), Path(thumbnail_path))
+                        print(f"Generated thumbnail for image file: {entry_path} -> {thumbnail_path}")
 
                     # Use the relative path for URL generation, ensuring forward slashes
                     content["files"].append({
                         "type": "image",
-                        "name": entry,
-                        "path": url_for("gallery_file",
-                                        filepath=os.path.relpath(entry_path, BASE_DIR).replace("\\", "/")),
-                        "thumbnail": f"/static/{os.path.relpath(thumbnail_path, 'static').replace('\\', '/')}"
+                        "path": url_for("gallery_file", filepath=Path(entry_path).relative_to(BASE_DIR).as_posix()),
+                        "thumbnail": url_for("static", filename=f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}")
                     })
+                    print(f"Thumbnail relative URL for image: thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}")
 
                 # For videos
                 elif ext in [".mp4", ".avi", ".mov"]:
                     # Generate the thumbnail path and normalize it for URLs
-                    thumbnail_path = recreate_folder_structure(entry_path, BASE_DIR, THUMBNAIL_DIR)
+                    thumbnail_path = recreate_folder_structure(Path(entry_path), BASE_DIR, THUMBNAIL_DIR)
                     thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
 
                     if not os.path.exists(thumbnail_path):
-                        generate_video_thumbnail(entry_path, thumbnail_path)
+                        generate_video_thumbnail(Path(entry_path), Path(thumbnail_path))
+                        print(f"Generated thumbnail for video file: {entry_path} -> {thumbnail_path}")
 
                     # Use the relative path for URL generation, ensuring forward slashes
+                    thumbnail_relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
+                    print(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
                     content["files"].append({
                         "type": "video",
                         "name": entry,
                         "path": url_for("gallery_file",
-                                        filepath=os.path.relpath(entry_path, BASE_DIR).replace("\\", "/")),
-                        "thumbnail": f"/static/{os.path.relpath(thumbnail_path, 'static').replace('\\', '/')}"
+                                        filepath=os.path.relpath(Path(entry_path), BASE_DIR).replace("\\", "/")),
+                        "thumbnail": url_for("static", filename=thumbnail_relative_url)
                     })
 
     return content
@@ -305,7 +251,6 @@ def gallery():
     total_images = count_images_in_directory(BASE_DIR)
     content = get_folder_content(BASE_DIR)
     return render_template("index.html", folders=content["folders"], files=content["files"], breadcrumb=[], total_images=total_images, enumerate=enumerate)
-
 @app.route("/<path:subpath>/")
 def subgallery(subpath):
     """Dynamic route for gallery subfolders."""
@@ -319,13 +264,11 @@ def subgallery(subpath):
     breadcrumb = subpath.split("/") if subpath else []
     parent_path = "/".join(breadcrumb[:-1]) if breadcrumb else None
     return render_template("index.html", folders=content["folders"], files=content["files"], breadcrumb=breadcrumb, parent_path=parent_path, total_images=total_images, enumerate=enumerate)
-
 @app.route("/cleanup-thumbnails", methods=["POST"])
 def cleanup_thumbnails_route():
     """Endpoint to clean up unused thumbnails."""
     cleanup_thumbnails(BASE_DIR, THUMBNAIL_DIR)
     return "Thumbnail cleanup completed!", 200
-
 @app.route("/view/<path:filepath>")
 def gallery_file(filepath):
     """Serve files (images/videos)."""
@@ -335,12 +278,18 @@ def gallery_file(filepath):
         return "File not found", 404
     print(f"Serving file: {full_path}")
     return send_from_directory(BASE_DIR, filepath)
-
 @app.route('/favicon.ico')
 def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.ico', mimetype='image/vnd.microsoft.icon')
-
+@app.route('/static/<path:filename>')
+def static_files(filename):
+    # Serve specific files from the static folder, not directory browsing
+    return send_from_directory('static', filename)
+@app.route('/static/')
+def block_static_folder_listing():
+    # Blocks listing of the /static/ directory
+    abort(403)
 
 # if __name__ == "__main__":
 #     app.run(host="0.0.0.0", port=5000, debug=False)
