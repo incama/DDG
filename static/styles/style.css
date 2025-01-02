@@ -18,10 +18,19 @@ body {
 }
 .header {
     background: #2F3235;
-    height: 100px;
+    height: 75px;
 }
-
-
+.header img {
+    float: left;
+    margin: 10px;
+}
+.header h1 {
+    position: relative;
+    top: 24px;
+    text-shadow: 0px 0px 5px #000000;
+    color: #a8d9ff;
+    font-size: 28px;
+}
 .clear {clear: both;}
 .bread {
     grid-area: bread;
@@ -59,11 +68,7 @@ body {
     padding: 10px;
 }
 h1#title {
-    position: relative;
-    left: 0px;
-    top: 0px;
     padding: 0px 10px 10px 10px;
-    width: 250px;
 }
 
 h2.content_header {
