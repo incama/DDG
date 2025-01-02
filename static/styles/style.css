@@ -48,10 +48,12 @@ body {
     text-decoration: none;
     margin-right: 5px;
     color: #a8d9ff;
+    text-shadow: 0px 0px 2px #000000;
 }
 .breadcrumb a:hover {
     text-decoration: underline;
 }
+span.material-icons {color: #a8d9ff; position: relative; top: 6px;}
 .left-column {
     grid-area: left-column;
     background: #4E5358;
