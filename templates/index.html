@@ -41,7 +41,6 @@
             <div class="folder">
                 <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb + [folder.name])) }}" title="{{ folder.name }}">
                     <img alt="{{ folder.name }}" src="{{ folder.preview or url_for('static', filename='default_folder_thumb.png') }}">
-                    <!-- <img src="{{ url_for('static', filename='default_folder_thumb.png') }}" alt="{{ folder.name }}"> -->
                 </a>
                 <div class="folder_name">{{ folder.name | truncate(15) }}</div>
             </div>

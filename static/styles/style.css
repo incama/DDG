@@ -68,7 +68,8 @@ h1#title {
 
 h2.content_header {
     padding: 10px;
-    color: #42474B;
+    color: #a8d9ff;
+    font-weight: normal;
 }
 p {
 }
@@ -77,14 +78,14 @@ p {
     text-align: center;
 }
 .footer p.centered {
-    color: #BAC1B9;
+    color: #a8d9ff;
     padding-top: 10px;
 }
 div.left-box-title {
-    border-bottom: 1px solid #BAC1B9;
+    border-bottom: 2px solid #575C62;
 }
 div.right-box-title {
-    border-bottom: 1px solid #81847D;
+    border-bottom: 2px solid #696F74;
 }
 .folders, .files {
     display: flex;
@@ -97,10 +98,10 @@ div.right-box-title {
 }
 .folder {
     width: 100px;
-    height: 135px;
-    margin-bottom: 10px;
-    padding-top: 10px;
-    border: 1px solid #656862;
+    height: 100px;
+    margin-bottom: 15px;
+
+    border: 1px solid #2F3235;
     background: #BAC1B9;
 }
 .folder img {
@@ -112,13 +113,15 @@ div.right-box-title {
 .file img {
     max-width: 200px;
     height: 200px;
+    border: 1px solid #2F3235;
 }
 .folder_name {
     font-size: 12px;
+    font-weight: normal;
     position: relative;
-    top: -7px;
+    top: -8px;
     bottom: 0px;
-    color: #42474B;
+    color: #a8d9ff;
 }
 .images, .files {
     display: flex;
