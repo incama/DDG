@@ -1,6 +1,7 @@
 import os
 import random
 import subprocess
+from unittest import result
 from flask import Flask, render_template, url_for, send_from_directory, abort
 from PIL import Image, ImageFile
 from pathlib import Path
@@ -31,45 +32,64 @@ def generate_thumbnail(file_path, thumbnail_path, size=(300, 300), quality=95, b
 
 def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timestamp="00:00:01"):
     try:
-        extracted_frame_path = Path(thumbnail_path).with_suffix('_raw.jpg')
-        subprocess.run(
+        # Check for FFmpeg availability BEFORE extracting frame
+        ffmpeg_check = subprocess.run(
+            ["where" if os.name == "nt" else "which", "ffmpeg"], capture_output=True
+        )
+        if ffmpeg_check.returncode != 0:
+            raise EnvironmentError("FFmpeg is not available on this system.")
+        print("FFmpeg is available.")
+
+        # Save raw frame in a temporary location before resizing
+        extracted_frame_path = Path(thumbnail_path).with_suffix('.temp.jpg')  # Temporary file
+        print(f"Raw extracted frame will be saved at: {extracted_frame_path}")
+        print(f"Final thumbnail will be saved at: {thumbnail_path}")
+
+        # Step 1: Run FFmpeg to extract a frame
+        result = subprocess.run(
             [
                 "ffmpeg",
                 "-i", str(video_path),  # Input video file
                 "-ss", timestamp,  # Timestamp for the frame
-                "-vframes", "1",  # Extract only one frame
-                str(extracted_frame_path),  # Path to save the extracted frame
+                "-frames:v", "1",  # Extract only one frame
+                "-update", "1",  # Ensure it writes exactly one output image
+                str(extracted_frame_path)  # Output path
             ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL
+            capture_output=True,  # Capture stdout and stderr for debugging
+            text=True  # Ensure output is text
         )
 
-        # Validate FFmpeg availability
-        if subprocess.run(["which", "ffmpeg"], capture_output=True).returncode != 0:
-            raise EnvironmentError("FFmpeg is not available on this system.")
-        with Image.open(extracted_frame_path) as img:
-            pass  # Add logic to handle the image
-    except (FileNotFoundError, OSError, EnvironmentError) as e:
-        print(f"Error generating video thumbnail for {video_path}: {e}")
+        # Log FFmpeg output and errors
+        print("FFmpeg command executed.")
+        print("FFmpeg output:", result.stdout)
+        print("FFmpeg errors:", result.stderr)
 
+        # Step 2: Check if FFmpeg successfully created the frame
         if not extracted_frame_path.exists():
-            print(f"Error extracting frame from video {video_path}")
-            return None
+            raise FileNotFoundError(f"FFmpeg did not generate the frame at {extracted_frame_path}")
+        print(f"Extracted frame successfully saved at: {extracted_frame_path}")
 
-        # Resize the extracted frame to the desired thumbnail size
-        with Image.open(extracted_frame_path) as img:
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-            img.save(thumbnail_path)
+        # Step 3: Resize the image using Pillow
+        try:
+            with Image.open(extracted_frame_path) as img:
+                print(f"Original image size: {img.size}")
+                img.thumbnail(size, Image.Resampling.LANCZOS)  # Resize to thumbnail dimensions
+                img.save(thumbnail_path)  # Save resized thumbnail to designated path
+                print(f"Thumbnail successfully saved at {thumbnail_path}")
+        except Exception as e:
+            raise RuntimeError(f"Error while resizing or saving image: {e}")
 
-        # Delete the raw extracted frame (cleanup)
-        os.remove(extracted_frame_path)
+        # Step 4: Cleanup (remove raw frame **only**)
+        if extracted_frame_path.exists():
+            extracted_frame_path.unlink(missing_ok=True)
+            print(f"Cleaned up raw frame at {extracted_frame_path}")
 
-        print(f"Thumbnail for video {video_path} saved at {thumbnail_path}")
-        return thumbnail_path
+        return thumbnail_path  # Success: Return thumbnail path
 
-    except Exception as e:
-        print(f"Error generating video thumbnail for {video_path}: {e}")
+    except (FileNotFoundError, OSError, EnvironmentError, RuntimeError) as e:
+        print(f"Error: {e}")
         return None
+
 
 def get_random_preview(folder_path: Path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
     folder_path = Path(folder_path)
