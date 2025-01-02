@@ -84,6 +84,7 @@ p {
 .centered {
     text-align: center;
 }
+.centered a {color: #FFB5A8;}
 .footer p.centered {
     color: #a8d9ff;
     padding-top: 10px;
