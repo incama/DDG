@@ -112,7 +112,6 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timest
     except (FileNotFoundError, OSError, EnvironmentError) as e:
         print(f"Error generating video thumbnail for {video_path}: {e}")
 
-
 def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
     folder_path = Path(folder_path)
     if not folder_path.exists():
@@ -198,7 +197,6 @@ def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
         import traceback
         print(f"Error during thumbnail cleanup: {e}")
         traceback.print_exc()
-
 
 def count_images_in_directory(folder_path: Path):
     folder_path = Path(folder_path).resolve()
