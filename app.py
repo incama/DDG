@@ -3,7 +3,7 @@ import random
 import subprocess
 from unittest import result
 from flask import Flask, render_template, url_for, send_from_directory, abort
-from PIL import Image, ImageFile
+from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
@@ -18,21 +18,57 @@ def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
     Path(thumbnail_path).parent.mkdir(parents=True, exist_ok=True)
     return thumbnail_path.as_posix()
 
-def generate_thumbnail(file_path, thumbnail_path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
+def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
+    """
+    Generate consistent thumbnails for images by cropping and zooming
+    into the content to match thumbnail dimensions.
+    """
     file_path = Path(file_path)
     try:
         with Image.open(file_path) as img:
-            img.thumbnail(size, Image.Resampling.LANCZOS)
-            thumb = Image.new("RGB", size, background_color)
-            thumb.paste(img, (int((size[0] - img.size[0]) / 2), int((size[1] - img.size[1]) / 2)))
-            thumb.save(thumbnail_path, "JPEG", quality=quality)
-            print(f"Thumbnail for {file_path} saved at {thumbnail_path}")
+            # Correct image oriantation
+            img = ImageOps.exif_transpose(img)
+            # Get original image size
+            width, height = img.size
+            target_width, target_height = size
+
+            # Compute aspect ratios
+            image_aspect = width / height
+            target_aspect = target_width / target_height
+
+            # Step 1: Crop the image to match the target aspect ratio (zoom effect)
+            if image_aspect > target_aspect:
+                # Wider than target: crop the width
+                new_width = int(height * target_aspect)
+                offset = (width - new_width) // 2
+                box = (offset, 0, offset + new_width, height)
+            else:
+                # Taller than target: crop the height
+                new_height = int(width / target_aspect)
+                offset = (height - new_height) // 2
+                box = (0, offset, width, offset + new_height)
+
+            img = img.crop(box)  # Crop the image to the calculated box
+            print(f"Cropped image to box: {box}, final size before resizing: {img.size}")
+
+            # Step 2: Resize the cropped image to the target size
+            img = img.resize(size, Image.Resampling.LANCZOS)
+
+            # Step 3: Save the resized (cropped and zoomed) thumbnail
+            img.save(thumbnail_path, "JPEG", quality=quality)
+            print(f"Thumbnail saved at {thumbnail_path} with size {size}")
+
+        return thumbnail_path
     except (FileNotFoundError, OSError) as e:
         print(f"Error generating thumbnail for {file_path}: {e}")
 
-def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timestamp="00:00:01"):
+def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timestamp="00:00:01"):
+    """
+    Generate consistent thumbnails for videos by cropping and zooming
+    into the video frame to match thumbnail dimensions.
+    """
     try:
-        # Check for FFmpeg availability BEFORE extracting frame
+        # Check for FFmpeg availability
         ffmpeg_check = subprocess.run(
             ["where" if os.name == "nt" else "which", "ffmpeg"], capture_output=True
         )
@@ -40,64 +76,51 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timest
             raise EnvironmentError("FFmpeg is not available on this system.")
         print("FFmpeg is available.")
 
-        # Save raw frame in a temporary location before resizing
+        # Save the raw frame to a temporary location
         extracted_frame_path = Path(thumbnail_path).with_suffix('.temp.jpg')  # Temporary file
-        print(f"Raw extracted frame will be saved at: {extracted_frame_path}")
-        print(f"Final thumbnail will be saved at: {thumbnail_path}")
+        print(f"Raw frame will be saved at {extracted_frame_path}")
 
-        # Step 1: Run FFmpeg to extract a frame
+        # Step 1: Extract a frame using FFmpeg
         result = subprocess.run(
             [
                 "ffmpeg",
                 "-i", str(video_path),  # Input video file
                 "-ss", timestamp,  # Timestamp for the frame
                 "-frames:v", "1",  # Extract only one frame
-                "-update", "1",  # Ensure it writes exactly one output image
                 str(extracted_frame_path)  # Output path
             ],
-            capture_output=True,  # Capture stdout and stderr for debugging
-            text=True  # Ensure output is text
+            capture_output=True,
+            text=True
         )
 
-        # Log FFmpeg output and errors
+        # Log FFmpeg outputs for debugging
         print("FFmpeg command executed.")
         print("FFmpeg output:", result.stdout)
         print("FFmpeg errors:", result.stderr)
 
-        # Step 2: Check if FFmpeg successfully created the frame
-        if not extracted_frame_path.exists():
-            raise FileNotFoundError(f"FFmpeg did not generate the frame at {extracted_frame_path}")
-        print(f"Extracted frame successfully saved at: {extracted_frame_path}")
+        # Step 2: Process the extracted image frame
+        if extracted_frame_path.exists():
+            generate_thumbnail(extracted_frame_path, thumbnail_path, size=size)  # Crop and resize for consistency
 
-        # Step 3: Resize the image using Pillow
-        try:
-            with Image.open(extracted_frame_path) as img:
-                print(f"Original image size: {img.size}")
-                img.thumbnail(size, Image.Resampling.LANCZOS)  # Resize to thumbnail dimensions
-                img.save(thumbnail_path)  # Save resized thumbnail to designated path
-                print(f"Thumbnail successfully saved at {thumbnail_path}")
-        except Exception as e:
-            raise RuntimeError(f"Error while resizing or saving image: {e}")
-
-        # Step 4: Cleanup (remove raw frame **only**)
+        # Step 3: Cleanup temporary raw frame
         if extracted_frame_path.exists():
             extracted_frame_path.unlink(missing_ok=True)
-            print(f"Cleaned up raw frame at {extracted_frame_path}")
+            print(f"Temporary raw frame removed: {extracted_frame_path}")
 
-        return thumbnail_path  # Success: Return thumbnail path
+        return thumbnail_path
 
-    except (FileNotFoundError, OSError, EnvironmentError, RuntimeError) as e:
-        print(f"Error: {e}")
-        return None
+    except (FileNotFoundError, OSError, EnvironmentError) as e:
+        print(f"Error generating video thumbnail for {video_path}: {e}")
 
-def get_random_preview(folder_path: Path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
+
+def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
     folder_path = Path(folder_path)
     if not folder_path.exists():
         print(f"Folder {folder_path} does not exist.")
         return url_for("static", filename="default_folder_thumb.png")
 
     # Gather all valid image files in the folder
-    files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp"]]
+    files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]]
     print(f"Found files in folder {folder_path}: {files}")
 
     # Check if there are no valid image files
@@ -123,7 +146,7 @@ def get_random_preview(folder_path: Path, size=(300, 300), quality=95, backgroun
             thumbnail_path,
             size=size,
             quality=quality,
-            background_color=background_color,
+            # background_color=background_color,
         )
 
     # Return the relative thumbnail path for URLs

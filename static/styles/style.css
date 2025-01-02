@@ -3,7 +3,7 @@ body {
     padding: 0;
     font-size: 100%;
     font-family: "Bebas Neue";
-    background: #42474B;
+    background: #2F3235;
     color: darkgray;
 }
 /* START GRID DEFINITION */
@@ -17,7 +17,7 @@ body {
     "left-column content content";
 }
 .header {
-    background: #42474B;
+    background: #2F3235;
     height: 100px;
 }
 
@@ -25,7 +25,7 @@ body {
 .clear {clear: both;}
 .bread {
     grid-area: bread;
-    background: #81847D;
+    background: #4E5358;
     padding: 10px 5px 5px 370px;
     color: #42474B;
 }
@@ -45,21 +45,21 @@ body {
 }
 .left-column {
     grid-area: left-column;
-    background: #81847D;
+    background: #4E5358;
     padding: 5px;
 }
 .content {
     grid-area: content;
-    background: #BAC1B9;
+    background: #6F757B;
     padding: 5px;
 }
 .footer {
-    background: #81847D;
+    background: #4E5358;
     text-align: center;
     padding: 10px;
 }
 h1#title {
-    position: fixed;
+    position: relative;
     left: 0px;
     top: 0px;
     padding: 0px 10px 10px 10px;
@@ -111,7 +111,7 @@ div.right-box-title {
 }
 .file img {
     max-width: 200px;
-    height: auto;
+    height: 200px;
 }
 .folder_name {
     font-size: 12px;
@@ -126,7 +126,7 @@ div.right-box-title {
     margin-top: 10px;
 }
 .image, .file {
-    margin: 10px;
+    margin: 5px;
     text-align: center;
 }
 .image {
@@ -146,7 +146,7 @@ div.right-box-title {
     color: #42474B;
 }
 .cleanup-button-container {
-    position: fixed;
+    position: relative;
     right: 10px;
     top: 10px;
     text-align: center;
