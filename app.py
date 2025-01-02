@@ -90,7 +90,6 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(300, 300), timest
         print(f"Error: {e}")
         return None
 
-
 def get_random_preview(folder_path: Path, size=(300, 300), quality=95, background_color=(186, 193, 185)):
     folder_path = Path(folder_path)
     if not folder_path.exists():
@@ -136,52 +135,47 @@ def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
     try:
         thumbnail_dir = Path(thumbnail_dir).resolve()
         base_dir = Path(base_dir).resolve()
+
         if not thumbnail_dir.exists():
             print(f"Thumbnail directory {thumbnail_dir} does not exist.")
-        for item in sorted(thumbnail_dir.rglob("*")):
-            if item.is_dir():
-                corresponding_path = Path(base_dir) / item.relative_to(Path(thumbnail_dir))
+            return
+
+        # Traverse all items in the thumbnail directory
+        for item in sorted(thumbnail_dir.rglob("*"), reverse=True):  # Reverse ensures we clean deepest items first
+            if item.is_file():
+                # Check if the original file still exists in the base directory
+                corresponding_path = Path(base_dir) / item.relative_to(thumbnail_dir)
                 if not corresponding_path.exists():
-                    print(f"Removing directory: {item}")
-                    item.rmdir()
-            elif item.is_file():
-                corresponding_path = Path(base_dir) / item.relative_to(Path(thumbnail_dir))
-                if not corresponding_path.parent.exists():
-                    print(f"Removing file: {item}")
-                    item.unlink()
-
-        # Traverse the directory structure of thumbnails
-        for root, dirs, files in os.walk(thumbnail_dir):
-            for folder in dirs:
-                original_folder_path = os.path.join(base_dir, os.path.relpath(os.path.join(root, folder), Path(thumbnail_dir)))
-                thumbnail_folder_path = os.path.join(root, folder)
-
-                # If the original folder does not exist, remove its thumbnail folder
-                if not os.path.exists(original_folder_path):
-                    print(f"Removing unused thumbnail folder: {thumbnail_folder_path}")
+                    print(f"Removing unused thumbnail file: {item}")
                     try:
-                        os.rmdir(thumbnail_folder_path)  # Remove empty folder
-                        print(f"Removed {thumbnail_folder_path}")
+                        item.unlink()
                     except OSError as e:
-                        print(f"Failed to remove {thumbnail_folder_path}: {e}")
-
-            # Delete unused thumbnail files
-            for file in files:
-                thumbnail_file_path = os.path.join(root, file)
-                original_file_path = os.path.join(base_dir, os.path.relpath(thumbnail_file_path, Path(thumbnail_dir)))
-
-                if not os.path.exists(os.path.dirname(original_file_path)):
-                    print(f"Removing unused thumbnail file: {thumbnail_file_path}")
+                        print(f"Failed to remove file {item}: {e}")
+            elif item.is_dir():
+                # Check if the corresponding folder exists in the base structure
+                corresponding_path = Path(base_dir) / item.relative_to(thumbnail_dir)
+                if not corresponding_path.exists():
+                    print(f"Removing unused thumbnail folder: {item}")
                     try:
-                        os.remove(thumbnail_file_path)
-                        print(f"Removed {thumbnail_file_path}")
+                        item.rmdir()  # Only removes empty directories
                     except OSError as e:
-                        print(f"Failed to remove {thumbnail_file_path}: {e}")
+                        print(f"Failed to remove folder {item}: {e}")
+
+        # After recursive cleanup, check if the main thumbnail directory can also be cleaned
+        try:
+            if not any(thumbnail_dir.iterdir()):  # Check if directory is empty
+                thumbnail_dir.rmdir()
+                print(f"Thumbnail directory {thumbnail_dir} is removed.")
+            else:
+                print(f"Thumbnail directory {thumbnail_dir} is not empty after cleanup.")
+        except OSError as e:
+            print(f"Failed to remove the main thumbnail directory: {e}")
 
     except Exception as e:
         import traceback
         print(f"Error during thumbnail cleanup: {e}")
         traceback.print_exc()
+
 
 def count_images_in_directory(folder_path: Path):
     folder_path = Path(folder_path).resolve()
