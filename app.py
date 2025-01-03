@@ -5,6 +5,11 @@ from unittest import result
 from flask import Flask, render_template, url_for, send_from_directory, abort
 from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
+from config import (
+    BASE_DIR, THUMBNAIL_DIR, THUMBNAIL_SIZE, THUMBNAIL_QUALITY,
+    DEFAULT_FOLDER_THUMBNAIL, FFMPEG_FRAME_TIMESTAMP,
+    APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE
+)
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
 BASE_DIR = Path("gallery").resolve()
@@ -331,4 +336,4 @@ def block_static_folder_listing():
 
 if __name__ == "__main__":
     from waitress import serve
-    serve(app, host="0.0.0.0", port=8080, threads=10)
+    serve(app, host=APP_HOST, port=APP_PORT, threads=APP_THREADS)
