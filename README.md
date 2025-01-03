@@ -75,6 +75,7 @@ gallery/
 │   ├───african
 │   ├───cats
 │   │   └───kittens
+│   │   └───lions
 │   ├───dogs
 │   └───horses
 ├───buildings
