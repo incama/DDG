@@ -37,7 +37,7 @@ DDG, or Directory Driven Gallery, is a dynamic web application designed to creat
 ### 1. Clone this repository
 ```bash
 git clone https://github.com/incama/DDG.git
-cd <your-repo-folder>
+cd DDG
 ```
 
 ### 2. Install Python Dependencies
@@ -118,9 +118,11 @@ To deploy the app on a production server:
 
 Future features planned for DDG include:
 - Pagination for large directories.
+- Replace Lightbox2 with something futureproof.
 - ~~User authentication for private galleries/sharing~~. (not any time soon!)
 - Drag-and-drop file uploads via web UI.
 - Custom themes for enhanced visual design.
+- Face and object recognition. (In a galaxy far, far away!)
 
 ---
 
