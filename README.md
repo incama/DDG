@@ -110,7 +110,7 @@ Update the following variables in `app.py` according to your needs:
 
 To deploy the app on a production server:
 1. Use **Waitress** as the WSGI server (already included in the app).
-2. Serve behind a reverse proxy such as **Nginx** or **Apache**.
+2. Serve behind a reverse proxy such as **Nginx** or **Apache**. Even better, use **NPM**!
 3. Ensure all static files and dependencies are configured on the server.
 
 ---
@@ -119,11 +119,13 @@ To deploy the app on a production server:
 
 Future features planned for DDG include:
 - Pagination for large directories.
+- Add loading page with info when app is generating thumbnails.
 - Replace Lightbox2 with something futureproof.
 - ~~User authentication for private galleries/sharing~~. (not any time soon!)
 - Drag-and-drop file uploads via web UI.
 - Custom themes for enhanced visual design.
 - Face and object recognition. (In a galaxy far, far away!)
+- Remove debug lines for speeding up generating thumbnails.
 
 ---
 
