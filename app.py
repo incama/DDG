@@ -139,24 +139,25 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timest
 def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
     folder_path = Path(folder_path)
     if not folder_path.exists():
-        print(f"Folder {folder_path} does not exist.")
+        logging.warning(f"Folder {folder_path} does not exist.")
         return url_for("static", filename="default_folder_thumb.png")
 
     # Gather all valid image files in the folder
     files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]]
-
-    print(f"Found files in folder {folder_path}: {files}")
+    logging.debug(f"Found files in folder {folder_path}: {files}")
 
     # Check if there are no valid image files
     if not files:
+        logging.info(f"No valid image files found in folder {folder_path}. Using fallback thumbnail.")
         fallback = THUMBNAIL_DIR / "default_folder_thumb.png"
         if not fallback.exists():
             fallback.touch()  # Create an empty fallback file if it doesn't exist
+            logging.debug(f"Created an empty fallback file at {fallback}")
         return url_for("static", filename="default_folder_thumb.png")
 
     # Randomly select an image for preview
     selected_image = random.choice(files)
-    print(f"Selected image for thumbnail: {selected_image}")
+    logging.info(f"Selected image for thumbnail: {selected_image}")
 
     # Generate a thumbnail path
     thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
@@ -175,7 +176,7 @@ def get_random_preview(folder_path: Path, size=(200, 200), quality=95, backgroun
 
     # Return the relative thumbnail path for URLs
     relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
-    print(f"Generated relative URL for thumbnail: {relative_url}")
+    logging.debug(f"Generated relative URL for thumbnail: {relative_url}")
     return url_for("static", filename=relative_url)
 
 def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
@@ -244,7 +245,7 @@ def count_images_in_directory(folder_path: Path):
 
 def get_folder_content(current_path):
     """Get folder and file content dynamically, verifying that all directories/files actually exist."""
-    print(f"Scanning: {current_path}")
+    logging.info(f"Scanning directory: {current_path}")
     content = {"folders": [], "files": []}
 
     current_path = Path(current_path)
@@ -255,12 +256,12 @@ def get_folder_content(current_path):
             # Process folders
             if os.path.isdir(entry_path):
                 preview = get_random_preview(entry_path)
-                print(f"Folder preview for {entry_path}: {preview}")
+                logging.debug(f"Folder preview for {entry_path}: {preview}")
                 content["folders"].append({
                     "preview": preview,
                     "name": entry,
                 })
-                print(f"Adding folder to content: {entry}")
+                logging.info(f"Added folder to content: {entry}")
 
 
             # Process files
@@ -275,7 +276,7 @@ def get_folder_content(current_path):
 
                     if not os.path.exists(thumbnail_path):
                         generate_thumbnail(Path(entry_path), Path(thumbnail_path))
-                        print(f"Generated thumbnail for image file: {entry_path} -> {thumbnail_path}")
+                        logging.info(f"Generated thumbnail for image file: {entry_path} -> {thumbnail_path}")
 
                     # Use the relative path for URL generation, ensuring forward slashes
                     content["files"].append({
@@ -293,7 +294,7 @@ def get_folder_content(current_path):
 
                     if not os.path.exists(thumbnail_path):
                         generate_video_thumbnail(Path(entry_path), Path(thumbnail_path))
-                        print(f"Generated thumbnail for video file: {entry_path} -> {thumbnail_path}")
+                        logging.info(f"Generated thumbnail for video file: {entry_path} -> {thumbnail_path}")
 
                     # Use the relative path for URL generation, ensuring forward slashes
                     thumbnail_relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
@@ -305,6 +306,9 @@ def get_folder_content(current_path):
                                         filepath=os.path.relpath(Path(entry_path), BASE_DIR).replace("\\", "/")),
                         "thumbnail": url_for("static", filename=thumbnail_relative_url)
                     })
+                    logging.debug(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
+    else:
+        logging.warning(f"Directory does not exist: {current_path}")
 
     return content
 
