@@ -2,6 +2,7 @@ import os
 import random
 import subprocess
 from unittest import result
+import logging
 from flask import Flask, render_template, url_for, send_from_directory, abort
 from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
@@ -17,6 +18,14 @@ THUMBNAIL_DIR = Path(app.static_folder) / "thumbnails"
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
 
+# Configure logging
+logging.basicConfig(
+    filename="log/app.log",  # Log file
+    filemode="a",  # Append mode (adds to logs instead of overwriting)
+    format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
+    level=logging.WARNING  # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+)
+
 def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
     relative_path = Path(file_path).relative_to(Path(base_dir))
     thumbnail_path = Path(thumbnail_dir) / relative_path
@@ -24,11 +33,6 @@ def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
     return thumbnail_path.as_posix()
 
 def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
-    """
-    Generate consistent thumbnails for images by cropping and zooming
-    into the content to match thumbnail dimensions.
-    Handles PNG images with transparency by converting them to JPEG-friendly 'RGB'.
-    """
     file_path = Path(file_path)
     try:
         with Image.open(file_path) as img:
@@ -75,7 +79,7 @@ def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
         return thumbnail_path
 
     except (FileNotFoundError, OSError) as e:
-        print(f"Error generating thumbnail for {file_path}: {e}")
+        logging.error(f"Error generating thumbnail for {file_path}: {e}")
 
 def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timestamp="00:00:01"):
     """
@@ -216,14 +220,20 @@ def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
 def count_images_in_directory(folder_path: Path):
     folder_path = Path(folder_path).resolve()
     print(f"Resolved folder path: {folder_path}")
+
     if not folder_path.exists():
-        print(f"Folder {folder_path} does not exist.")
-    print(f"Counting images in folder: {folder_path}")
+        logging.warning(f"Folder does not exist while counting images: {folder_path}")
+        return 0
+
     try:
+        logging.info(f"Counting images in folder: {folder_path}")
         image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
-        return sum(1 for f in folder_path.glob("*") if f.suffix.lower() in image_extensions)
+        count = sum(1 for f in folder_path.glob("*") if f.suffix.lower() in image_extensions)
+        logging.debug(f"Found {count} images in folder: {folder_path}")
+        return count
+
     except Exception as e:
-        print(f"Error counting images in directory {folder_path}: {e}")
+        logging.error(f"Error counting images in directory {folder_path}: {e}")
         return 0
 
 def get_folder_content(current_path):
@@ -313,6 +323,10 @@ def subgallery(subpath):
     content = get_folder_content(current_path)
     breadcrumb = subpath.split("/") if subpath else []
     parent_path = "/".join(breadcrumb[:-1]) if breadcrumb else None
+
+    logging.info(
+        f"Subgallery loaded: {current_path}, containing {len(content['folders'])} folders and {len(content['files'])} files.")
+
     return render_template("index.html", folders=content["folders"], files=content["files"], breadcrumb=breadcrumb, parent_path=parent_path, total_images=total_images, enumerate=enumerate)
 @app.route("/cleanup-thumbnails", methods=["POST"])
 def cleanup_thumbnails_route():
