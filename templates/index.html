@@ -21,7 +21,6 @@
   <div class="header">
       <a href="{{ url_for('gallery') }}"><img alt="IDDG" src="{{ url_for('static', filename='images/logo.png') }}" title="Incama's Directory Drive Galery" /></a>
         <h1>Directory Driven Gallery</h1>
-
   </div>
     <div class="bread">
       <div class="breadcrumb"><span class="material-icons">home</span>
@@ -50,7 +49,7 @@
   </div>
   <div class="content">
       <div class="right-box-title">
-          <h2 class="content_header">Files:</h2>
+          <h2 class="content_header">Files #{{ total_images }}</h2>
       </div>
       <div class="files">
         {% for file in files %}
