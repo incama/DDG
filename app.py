@@ -27,12 +27,21 @@ def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
     """
     Generate consistent thumbnails for images by cropping and zooming
     into the content to match thumbnail dimensions.
+    Handles PNG images with transparency by converting them to JPEG-friendly 'RGB'.
     """
     file_path = Path(file_path)
     try:
         with Image.open(file_path) as img:
-            # Correct image oriantation
+            # Correct image orientation
             img = ImageOps.exif_transpose(img)
+
+            # Convert PNG with alpha channel (RGBA) to RGB
+            if img.mode in ("RGBA", "P"):  # Handle transparency or palette mode
+                # Create a white background and paste the image onto it
+                background = Image.new("RGB", img.size, (255, 255, 255))  # Solid white
+                background.paste(img, mask=img.getchannel("A"))  # Use alpha channel as mask
+                img = background
+
             # Get original image size
             width, height = img.size
             target_width, target_height = size
@@ -59,11 +68,12 @@ def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
             # Step 2: Resize the cropped image to the target size
             img = img.resize(size, Image.Resampling.LANCZOS)
 
-            # Step 3: Save the resized (cropped and zoomed) thumbnail
+            # Step 3: Save the resized (cropped and zoomed) thumbnail as a JPEG
             img.save(thumbnail_path, "JPEG", quality=quality)
             print(f"Thumbnail saved at {thumbnail_path} with size {size}")
 
         return thumbnail_path
+
     except (FileNotFoundError, OSError) as e:
         print(f"Error generating thumbnail for {file_path}: {e}")
 
@@ -140,7 +150,7 @@ def get_random_preview(folder_path: Path, size=(200, 200), quality=95, backgroun
 
     # Generate a thumbnail path
     thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
-    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".png"
+    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
 
     # Generate the thumbnail if it doesn't already exist
     if not Path(thumbnail_path).exists():
