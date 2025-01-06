@@ -86,7 +86,7 @@ def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
     except (FileNotFoundError, OSError) as e:
         logging.error(f"Error generating thumbnail for {file_path}: {e}")
 
-def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timestamp="00:00:01"):
+def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timestamp="00:00:00"):
     """
     Generate consistent thumbnails for videos by cropping and zooming
     into the video frame to match thumbnail dimensions.
