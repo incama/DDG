@@ -9,7 +9,7 @@ from pathlib import Path
 from config import (
     BASE_DIR, THUMBNAIL_DIR, THUMBNAIL_SIZE, THUMBNAIL_QUALITY,
     DEFAULT_FOLDER_THUMBNAIL, FFMPEG_FRAME_TIMESTAMP,
-    APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE
+    APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE, LOGGING_LEVEL
 )
 app = Flask(__name__)
 # Base gallery and thumbnail dirs
@@ -28,7 +28,7 @@ logging.basicConfig(
     filename="log/app.log",  # Log file
     filemode="a",  # Append mode (adds to logs instead of overwriting)
     format="%(asctime)s - %(levelname)s - %(message)s",  # Log format
-    level=logging.WARNING  # Logging level (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+    level=LOGGING_LEVEL
 )
 
 def recreate_folder_structure(file_path, base_dir, thumbnail_dir):
@@ -72,14 +72,14 @@ def generate_thumbnail(file_path, thumbnail_path, size=(200, 200), quality=95):
                 box = (0, offset, width, offset + new_height)
 
             img = img.crop(box)  # Crop the image to the calculated box
-            print(f"Cropped image to box: {box}, final size before resizing: {img.size}")
+            logging.info(f"Cropped image to box: {box}, final size before resizing: {img.size}")
 
             # Step 2: Resize the cropped image to the target size
             img = img.resize(size, Image.Resampling.LANCZOS)
 
             # Step 3: Save the resized (cropped and zoomed) thumbnail as a JPEG
             img.save(thumbnail_path, "JPEG", quality=quality)
-            print(f"Thumbnail saved at {thumbnail_path} with size {size}")
+            logging.info(f"Thumbnail saved at {thumbnail_path} with size {size}")
 
         return thumbnail_path
 
@@ -144,6 +144,7 @@ def get_random_preview(folder_path: Path, size=(200, 200), quality=95, backgroun
 
     # Gather all valid image files in the folder
     files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]]
+
     print(f"Found files in folder {folder_path}: {files}")
 
     # Check if there are no valid image files
