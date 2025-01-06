@@ -140,7 +140,7 @@ def get_random_preview(folder_path: Path, size=(200, 200), quality=95, backgroun
 
     # Generate a thumbnail path
     thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
-    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
+    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".png"
 
     # Generate the thumbnail if it doesn't already exist
     if not Path(thumbnail_path).exists():
