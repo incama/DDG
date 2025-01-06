@@ -19,6 +19,11 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
 
 # Configure logging
+
+# Ensure the logging directory exists
+log_dir = Path("log")
+log_dir.mkdir(parents=True, exist_ok=True)  # Create 'log' directory if it doesn't exist
+
 logging.basicConfig(
     filename="log/app.log",  # Log file
     filemode="a",  # Append mode (adds to logs instead of overwriting)
