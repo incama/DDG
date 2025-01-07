@@ -17,7 +17,7 @@ BASE_DIR = Path("gallery").resolve()
 THUMBNAIL_DIR = Path(app.static_folder) / "thumbnails"
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
-
+thumbnail_cache = {}
 # Configure logging
 
 # Ensure the logging directory exists
@@ -136,38 +136,101 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timest
     except (FileNotFoundError, OSError, EnvironmentError) as e:
         print(f"Error generating video thumbnail for {video_path}: {e}")
 
-def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
+# def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
+#     folder_path = Path(folder_path)
+#
+#     # Check if folder exists
+#     if not folder_path.exists():
+#         logging.warning(f"Folder {folder_path} does not exist.")
+#         return url_for("static", filename="default_folder_thumb.png")
+#
+#     # Check if the folder has a cached thumbnail
+#     if folder_path in thumbnail_cache:
+#         logging.info(f"Cache hit for folder {folder_path}")
+#         return thumbnail_cache[folder_path]  # Return cached URL
+#
+#     logging.info(f"Cache miss for folder {folder_path}. Generating thumbnail.")
+#
+#     # Gather all valid image files in the folder
+#     files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]]
+#     logging.debug(f"Found files in folder {folder_path}: {files}")
+#
+#     # Check if there are no valid image files
+#     if not files:
+#         logging.info(f"No valid image files found in folder {folder_path}. Using fallback thumbnail.")
+#         fallback = THUMBNAIL_DIR / "default_folder_thumb.png"
+#         if not fallback.exists():
+#             fallback.touch()  # Create an empty fallback file if it doesn't exist
+#             logging.debug(f"Created an empty fallback file at {fallback}")
+#         url = url_for("static", filename="default_folder_thumb.png")
+#         thumbnail_cache[folder_path] = url  # Update cache
+#         return url
+#
+#     # Randomly select an image for preview
+#     selected_image = random.choice(files)
+#     logging.info(f"Selected image for thumbnail: {selected_image}")
+#
+#     # Generate a thumbnail path
+#     thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
+#     thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
+#
+#     # Generate the thumbnail if it doesn't already exist
+#     if not Path(thumbnail_path).exists():
+#         logging.info(f"Thumbnail not found, generating: {thumbnail_path}")
+#         generate_thumbnail(
+#             selected_image,
+#             thumbnail_path,
+#             size=size,
+#             quality=quality,
+#             # background_color=background_color,
+#         )
+#
+#     # Return the relative thumbnail path for URLs
+#     relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
+#     logging.debug(f"Generated relative URL for thumbnail: {relative_url}")
+#     thumbnail_url = url_for("static", filename=relative_url)
+#
+#     # Cache the generated thumbnail URL
+#     thumbnail_cache[folder_path] = thumbnail_url
+#     return thumbnail_url
+def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
+    """
+    Generate a preview for a folder using the first valid image/video file found in the folder.
+    """
     folder_path = Path(folder_path)
+
+    # Check if folder exists
     if not folder_path.exists():
         logging.warning(f"Folder {folder_path} does not exist.")
         return url_for("static", filename="default_folder_thumb.png")
 
-    # Gather all valid image files in the folder
-    files = [f for f in folder_path.glob("*") if f.suffix.lower() in [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]]
-    logging.debug(f"Found files in folder {folder_path}: {files}")
+    # Gather all valid image/video files in the folder and sort them
+    valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]
+    files = sorted([f for f in folder_path.iterdir() if f.suffix.lower() in valid_extensions])
+    logging.debug(f"Sorted files in folder {folder_path}: {files}")
 
-    # Check if there are no valid image files
+    # Check if there are no valid files
     if not files:
-        logging.info(f"No valid image files found in folder {folder_path}. Using fallback thumbnail.")
+        logging.info(f"No valid image/video files found in folder {folder_path}. Using fallback thumbnail.")
         fallback = THUMBNAIL_DIR / "default_folder_thumb.png"
         if not fallback.exists():
             fallback.touch()  # Create an empty fallback file if it doesn't exist
             logging.debug(f"Created an empty fallback file at {fallback}")
         return url_for("static", filename="default_folder_thumb.png")
 
-    # Randomly select an image for preview
-    selected_image = random.choice(files)
-    logging.info(f"Selected image for thumbnail: {selected_image}")
+    # Use the first file as the preview
+    first_file = files[0]
+    logging.info(f"Using the first file as thumbnail: {first_file}")
 
     # Generate a thumbnail path
-    thumbnail_path = recreate_folder_structure(selected_image, BASE_DIR, THUMBNAIL_DIR)
+    thumbnail_path = recreate_folder_structure(first_file, BASE_DIR, THUMBNAIL_DIR)
     thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
 
     # Generate the thumbnail if it doesn't already exist
     if not Path(thumbnail_path).exists():
-        print(f"Thumbnail not found, generating: {thumbnail_path}")
+        logging.info(f"Thumbnail not found, generating: {thumbnail_path}")
         generate_thumbnail(
-            selected_image,
+            first_file,
             thumbnail_path,
             size=size,
             quality=quality,
@@ -178,6 +241,7 @@ def get_random_preview(folder_path: Path, size=(200, 200), quality=95, backgroun
     relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
     logging.debug(f"Generated relative URL for thumbnail: {relative_url}")
     return url_for("static", filename=relative_url)
+
 
 def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
     try:
@@ -255,7 +319,7 @@ def get_folder_content(current_path):
 
             # Process folders
             if os.path.isdir(entry_path):
-                preview = get_random_preview(entry_path)
+                preview = get_first_preview(entry_path)
                 logging.debug(f"Folder preview for {entry_path}: {preview}")
                 content["folders"].append({
                     "preview": preview,
