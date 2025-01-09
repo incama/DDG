@@ -176,3 +176,124 @@ div.right-box-title {
 .cleanup-button:hover {
     background-color: #ff3333;
 }
+
+
+.pagination {
+  display: inline-block;
+    text-align: center;
+}
+
+.pagination a {
+  color: #2F3235;
+  float: left;
+  padding: 2px 8px 1px 8px;
+  text-decoration: none;
+    font-size: 14px;
+}
+
+.pagination a.active {
+  background-color: #a8d9ff;
+  color: #2F3235;
+border-radius: 5px;
+}
+a.adjusted {
+    font-size: 18px;
+    font-weight: bold;
+
+}
+
+.pagination a:hover:not(.active) {background-color: #FFB5A8; border-radius: 5px;}
+
+
+
+
+/* Navigation */
+[data-pagination],
+[data-pagination] *,
+[data-pagination] *:before,
+[data-pagination] *:after {
+  -webkit-box-sizing: border-box;
+  -moz-box-sizing: border-box;
+  box-sizing: border-box;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-kerning: auto;
+}
+[data-pagination] {
+  font-size: 1pt;
+  line-height: 1;
+  font-weight: 400;
+  font-family: 'Open Sans', 'Source Sans Pro', Roboto, 'HelveticaNeue-Light', 'Helvetica Neue Light', 'Helvetica Neue', 'Myriad Pro', 'Segoe UI', Myriad, Helvetica, 'Lucida Grande', 'DejaVu Sans Condensed', 'Liberation Sans', 'Nimbus Sans L', Tahoma, Geneva, Arial, sans-serif;
+  -webkit-text-size-adjust: 100%;
+  margin: 1em auto;
+  text-align: center;
+  transition: font-size .2s ease-in-out;
+}
+[data-pagination] ul {
+  list-style-type: none;
+  display: inline;
+  font-size: 14px;
+  margin: 0;
+  padding: .5em;
+}
+[data-pagination] ul li {
+  display: inline-block;
+  font-size: 100%;
+  width: auto;
+  border-radius: 3px;
+}
+[data-pagination] > a {
+  font-size: 100%;
+}
+[data-pagination] a {
+  color: #a8d9ff;
+  font-size: 100%;
+  padding: .5em;
+}
+[data-pagination] a:focus,
+[data-pagination] a:hover {
+  color: #f60;
+}
+[data-pagination] li.current {
+  background-color: #f60;
+    padding: 3px;
+}
+/* Disabled & Hidden Styles */
+[data-pagination] .disabled,
+[data-pagination] [hidden],
+[data-pagination] [disabled] {
+  opacity: .5;
+  pointer-events: none;
+}
+@media (min-width: 350px) {
+  [data-pagination] {
+    font-size: 10pt;
+  }
+}
+@media (min-width: 500px) {
+  [data-pagination] {
+    font-size: 12pt;
+  }
+}
+@media (min-width: 700px) {
+  [data-pagination] {
+    font-size: 14pt;
+  }
+}
+@media (min-width: 900px) {
+  [data-pagination] {
+    font-size: 16pt;
+  }
+}
+.navi {
+    width: 100%;
+    padding: 0;
+    margin: 0 0 10px 0;
+    text-align: center;
+    border-bottom: 2px solid #696F74;
+}
+.bottom {
+    border-top: 2px solid #696F74;
+    padding-top: 10px;
+}

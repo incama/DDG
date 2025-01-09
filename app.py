@@ -1,24 +1,21 @@
 import os
-import random
+# import random | maybe in the near future when performance isn't an issue
 import subprocess
-from unittest import result
+from math import ceil
 import logging
-from flask import Flask, render_template, url_for, send_from_directory, abort
+from flask import Flask, render_template, url_for, send_from_directory, abort, request
 from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
 from config import (
     BASE_DIR, THUMBNAIL_DIR, THUMBNAIL_SIZE, THUMBNAIL_QUALITY,
     DEFAULT_FOLDER_THUMBNAIL, FFMPEG_FRAME_TIMESTAMP,
-    APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE, LOGGING_LEVEL
+    APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE, LOGGING_LEVEL, DEFAULT_LIMIT
 )
 app = Flask(__name__)
-# Base gallery and thumbnail dirs
-BASE_DIR = Path("gallery").resolve()
-THUMBNAIL_DIR = Path(app.static_folder) / "thumbnails"
+
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
 thumbnail_cache = {}
-# Configure logging
 
 # Ensure the logging directory exists
 log_dir = Path("log")
@@ -242,7 +239,6 @@ def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background
     logging.debug(f"Generated relative URL for thumbnail: {relative_url}")
     return url_for("static", filename=relative_url)
 
-
 def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
     try:
         thumbnail_dir = Path(thumbnail_dir).resolve()
@@ -290,7 +286,7 @@ def cleanup_thumbnails(base_dir: str, thumbnail_dir: str):
 
 def count_images_in_directory(folder_path: Path):
     folder_path = Path(folder_path).resolve()
-    print(f"Resolved folder path: {folder_path}")
+    logging.debug(f"Resolved folder path: {folder_path}")
 
     if not folder_path.exists():
         logging.warning(f"Folder does not exist while counting images: {folder_path}")
@@ -298,7 +294,7 @@ def count_images_in_directory(folder_path: Path):
 
     try:
         logging.info(f"Counting images in folder: {folder_path}")
-        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp']
+        image_extensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.mp4', '.avi', '.mov']
         count = sum(1 for f in folder_path.glob("*") if f.suffix.lower() in image_extensions)
         logging.debug(f"Found {count} images in folder: {folder_path}")
         return count
@@ -307,73 +303,87 @@ def count_images_in_directory(folder_path: Path):
         logging.error(f"Error counting images in directory {folder_path}: {e}")
         return 0
 
-def get_folder_content(current_path):
-    """Get folder and file content dynamically, verifying that all directories/files actually exist."""
+def get_folder_content(current_path, page=1, limit=DEFAULT_LIMIT):
+    """
+    Get folder and file content dynamically with pagination.
+
+    Args:
+        current_path (str): Path to the folder.
+        page (int): Current page number (default: 1).
+        limit (int): Number of files per page (default: 10).
+
+    Returns:
+        dict: Content including folders and paginated files.
+    """
     logging.info(f"Scanning directory: {current_path}")
     content = {"folders": [], "files": []}
 
     current_path = Path(current_path)
-    if current_path.exists():
-        for entry in sorted(os.listdir(current_path)):
-            entry_path = os.path.join(current_path, entry)
+    if current_path.exists():  # Check if the folder exists
+        # Sort and process all directory entries
+        entries = sorted(current_path.iterdir(), key=lambda entry: entry.name)
 
-            # Process folders
-            if os.path.isdir(entry_path):
-                preview = get_first_preview(entry_path)
-                logging.debug(f"Folder preview for {entry_path}: {preview}")
-                content["folders"].append({
-                    "preview": preview,
-                    "name": entry,
+        # Separate folders and files
+        folders = [entry for entry in entries if entry.is_dir()]
+        files = [entry for entry in entries if entry.is_file()]
+
+        # Process Folders
+        for folder in folders:
+            preview = get_first_preview(folder)  # Assuming this function exists
+            logging.debug(f"Folder preview for {folder}: {preview}")
+            content["folders"].append({
+                "preview": preview,
+                "name": folder.name,  # Only the folder name, without the full path
+            })
+
+        # Paginate Files
+        total_files = len(files)
+        start_idx = (page - 1) * limit
+        end_idx = start_idx + limit
+        paginated_files = files[start_idx:end_idx]
+
+        for file in paginated_files:
+            ext = file.suffix.lower()  # File extension
+
+            # Process Images
+            if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
+                # Generate or retrieve thumbnail
+                thumbnail_path = recreate_folder_structure(file, BASE_DIR, THUMBNAIL_DIR)
+                thumbnail_path = f"{Path(thumbnail_path).with_suffix('.jpg')}"
+
+                # Normalize thumbnail_path with forward slashes
+                thumbnail_path = str(Path(thumbnail_path).as_posix())
+
+                if not Path(thumbnail_path).exists():
+                    generate_thumbnail(file, thumbnail_path)
+
+                # Build file and thumbnail URLs
+                content["files"].append({
+                    "type": "image",
+                    "path": url_for("gallery_file", filepath=str(file.relative_to(BASE_DIR).as_posix())),
+                    "thumbnail": url_for("static", filename=f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"),
                 })
-                logging.info(f"Added folder to content: {entry}")
+            elif ext in [".mp4", ".avi", ".mov"]:
+                # Generate the thumbnail path and normalize it for URLs
+                thumbnail_path = recreate_folder_structure(file, BASE_DIR, THUMBNAIL_DIR)
+                thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
 
+                if not os.path.exists(thumbnail_path):
+                    generate_video_thumbnail(file, Path(thumbnail_path))
+                    logging.info(f"Generated thumbnail for video file: {file} -> {thumbnail_path}")
 
-            # Process files
-            elif os.path.isfile(entry_path):
-                ext = os.path.splitext(entry)[1].lower()
-
-                # For images
-                if ext in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-                    # Generate the thumbnail path and normalize it for URLs
-                    thumbnail_path = recreate_folder_structure(Path(entry_path), BASE_DIR, THUMBNAIL_DIR)
-                    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
-
-                    if not os.path.exists(thumbnail_path):
-                        generate_thumbnail(Path(entry_path), Path(thumbnail_path))
-                        logging.info(f"Generated thumbnail for image file: {entry_path} -> {thumbnail_path}")
-
-                    # Use the relative path for URL generation, ensuring forward slashes
-                    content["files"].append({
-                        "type": "image",
-                        "path": url_for("gallery_file", filepath=Path(entry_path).relative_to(BASE_DIR).as_posix()),
-                        "thumbnail": url_for("static", filename=f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}")
-                    })
-                    print(f"Thumbnail relative URL for image: thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}")
-
-                # For videos
-                elif ext in [".mp4", ".avi", ".mov"]:
-                    # Generate the thumbnail path and normalize it for URLs
-                    thumbnail_path = recreate_folder_structure(Path(entry_path), BASE_DIR, THUMBNAIL_DIR)
-                    thumbnail_path = os.path.splitext(thumbnail_path)[0] + ".jpg"
-
-                    if not os.path.exists(thumbnail_path):
-                        generate_video_thumbnail(Path(entry_path), Path(thumbnail_path))
-                        logging.info(f"Generated thumbnail for video file: {entry_path} -> {thumbnail_path}")
-
-                    # Use the relative path for URL generation, ensuring forward slashes
-                    thumbnail_relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
-                    print(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
-                    content["files"].append({
-                        "type": "video",
-                        "name": entry,
-                        "path": url_for("gallery_file",
-                                        filepath=os.path.relpath(Path(entry_path), BASE_DIR).replace("\\", "/")),
-                        "thumbnail": url_for("static", filename=thumbnail_relative_url)
-                    })
-                    logging.debug(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
+                # Use the relative path for URL generation, ensuring forward slashes
+                thumbnail_relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
+                logging.debug(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
+                content["files"].append({
+                    "type": "video",
+                    # "name": file,
+                    "path": url_for("gallery_file", filepath=str(file.relative_to(BASE_DIR).as_posix())),
+                    "thumbnail": url_for("static", filename=f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"),
+                })
+                logging.debug(f"Thumbnail relative URL for video: {thumbnail_relative_url}")
     else:
         logging.warning(f"Directory does not exist: {current_path}")
-
     return content
 
 @app.template_filter('truncate')
@@ -381,27 +391,120 @@ def truncate_filter(s, max_length=15):
     return s[:max_length] + "..." if len(s) > max_length else s
 @app.route("/")
 def gallery():
-    """Main gallery landing page."""
-    total_images = count_images_in_directory(BASE_DIR)
-    content = get_folder_content(BASE_DIR)
-    return render_template("index.html", folders=content["folders"], files=content["files"], breadcrumb=[], total_images=total_images, enumerate=enumerate)
+    """Main gallery landing page with pagination."""
+    try:
+        # Get pagination parameters
+        page = int(request.args.get("page", 1))  # Default to page 1
+        limit = int(request.args.get("limit", DEFAULT_LIMIT))  # Default to DEFAULT_LIMIT items per page
+
+        # Fetch folder contents and total images
+        logging.debug("Fetching images count.")
+        total_images = count_images_in_directory(BASE_DIR)
+
+        if total_images == 0:
+            logging.warning("No images found in the directory.")
+
+        content = get_folder_content(BASE_DIR, page=page, limit=limit)
+
+        # Calculate total pages
+        total_pages = max(1, ceil(total_images / limit))  # Ensure at least 1 page
+        logging.debug(f"Total pages calculated: {total_pages}")
+
+        # Calculate page range for pagination
+        window_size = 7  # Number of page links to show
+        start_page = max(1, page - window_size // 2)
+        end_page = min(total_pages, start_page + window_size - 1)
+        start_page = max(1, end_page - window_size + 1)
+
+        # Generate pagination data
+        page_numbers = list(range(start_page, end_page + 1))
+        logging.debug(f"Page numbers: {page_numbers}")
+
+        prev_url = url_for("gallery", page=page - 1, limit=limit) if page > 1 else None
+        next_url = url_for("gallery", page=page + 1, limit=limit) if page < total_pages else None
+
+        # Render the template
+        return render_template(
+            "index.html",
+            folders=content["folders"],
+            files=content["files"],
+            breadcrumb=[],
+            total_images=total_images,
+            total_pages=total_pages,
+            current_page=page,
+            parent_path=None,
+            prev_url=prev_url,
+            next_url=next_url,
+            page_numbers=page_numbers,
+            enumerate=enumerate,
+        )
+    except Exception as e:
+        logging.exception("Error in gallery function")
+        return "An error occurred. Please check the logs.", 500
 @app.route("/<path:subpath>/")
 def subgallery(subpath):
-    """Dynamic route for gallery subfolders."""
-    current_path = os.path.join(BASE_DIR, subpath)
-    print(f"Accessing subgallery: {current_path}")
+    """Dynamic subgallery with pagination."""
+    try:
+        # Build the current directory path
+        current_path = os.path.join(BASE_DIR, subpath)
+        logging.debug(f"Accessing subgallery: subpath={subpath}, current_path={current_path}")
 
-    if not os.path.exists(current_path):
-        return "Folder not found", 404
-    total_images = count_images_in_directory(current_path)
-    content = get_folder_content(current_path)
-    breadcrumb = subpath.split("/") if subpath else []
-    parent_path = "/".join(breadcrumb[:-1]) if breadcrumb else None
+        # Check if the path exists
+        if not os.path.exists(current_path):
+            logging.warning(f"Folder not found: {current_path}")
+            return "Folder not found", 404
 
-    logging.info(
-        f"Subgallery loaded: {current_path}, containing {len(content['folders'])} folders and {len(content['files'])} files.")
+        # Get pagination parameters
+        page = int(request.args.get("page", 1))  # Default to page 1
+        limit = int(request.args.get("limit", DEFAULT_LIMIT))  # Default to DEFAULT_LIMIT items per page
+        logging.debug(f"Pagination parameters: page={page}, limit={limit}")
 
-    return render_template("index.html", folders=content["folders"], files=content["files"], breadcrumb=breadcrumb, parent_path=parent_path, total_images=total_images, enumerate=enumerate)
+        # Fetch total images and folder contents
+        total_images = count_images_in_directory(current_path)
+        logging.debug(f"Total images in current_path='{current_path}': {total_images}")
+        content = get_folder_content(current_path, page=page, limit=limit)
+
+        # Breadcrumb and parent path for navigation
+        breadcrumb = subpath.split("/") if subpath else []
+        logging.debug(f"Breadcrumb: {breadcrumb}")
+        parent_path = "/".join(breadcrumb[:-1]) if breadcrumb else None
+
+        # Calculate total pages
+        total_pages = max(1, ceil(total_images / limit))  # Ensure at least 1 page
+        logging.debug(f"Total pages calculated: {total_pages}")
+
+        # Handle page range for pagination
+        window_size = 7  # Adjustable number of page links to display
+        start_page = max(1, page - window_size // 2)
+        end_page = min(total_pages, start_page + window_size - 1)
+        start_page = max(1, end_page - window_size + 1)
+        page_numbers = list(range(start_page, end_page + 1))
+
+        # Debug log for pagination
+        logging.debug(f"Page numbers: {page_numbers}")
+
+        # Handle pagination URLs
+        prev_url = url_for("subgallery", subpath=subpath, page=page - 1, limit=limit) if page > 1 else None
+        next_url = url_for("subgallery", subpath=subpath, page=page + 1, limit=limit) if page < total_pages else None
+
+        # Render the template (HTML structure assumes index.html supports folders/files display)
+        return render_template(
+            "index.html",
+            folders=content["folders"],
+            files=content["files"],
+            breadcrumb=breadcrumb,
+            total_images=total_images,
+            total_pages=total_pages,
+            current_page=page,
+            parent_path=parent_path,
+            prev_url=prev_url,
+            next_url=next_url,
+            page_numbers=page_numbers,
+            enumerate=enumerate,
+        )
+    except Exception as e:
+        logging.exception(f"Error in subgallery route: {e}")
+        return "An error occurred. Please check the logs.", 500
 @app.route("/cleanup-thumbnails", methods=["POST"])
 def cleanup_thumbnails_route():
     """Endpoint to clean up unused thumbnails."""
@@ -414,7 +517,7 @@ def gallery_file(filepath):
     if not os.path.exists(full_path):
         print(f"File not found: {full_path}")
         return "File not found", 404
-    print(f"Serving file: {full_path}")
+    logging.debug(f"Serving file: {full_path}")
     return send_from_directory(BASE_DIR, filepath)
 @app.route('/favicon.ico')
 def favicon():
@@ -429,6 +532,7 @@ def block_static_folder_listing():
     # Blocks listing of the /static/ directory
     abort(403)
 
+# Run if waitress is acting up or for development
 # if __name__ == "__main__":
 #     app.run(host="0.0.0.0", port=5000, debug=False)
 

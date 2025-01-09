@@ -47,11 +47,43 @@
         {% endfor %}
     </div>
   </div>
+
+          <!-- Files -->
   <div class="content">
       <div class="right-box-title">
-          <h2 class="content_header">Files #{{ total_images }}</h2>
+          <h2 class="content_header">Total Files in Directory #{{ total_images }}</h2>
       </div>
       <div class="files">
+          {% if total_images > 0 %}
+          <div class="navi">
+              <div class="pagination">
+                  <!-- previous button -->
+                  {% if prev_url %}
+                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 10)) }}">chevron_left</a>
+                  {% else %}
+                  <a class="material-icons adjusted" href="#">chevron_left</a>
+                  {% endif %}
+
+
+                <!-- Page Numbers -->
+                {% for page_number in page_numbers %}
+                {% if page_number == current_page %}
+                <a class="active" href="#">{{ page_number }}</a>
+                {% else %}
+                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 10)) }}">{{ page_number }}</a>
+                {% endif %}
+                {% endfor %}
+
+                  <!-- Next Button -->
+                {% if next_url %}
+                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 10)) }}">chevron_right</a>
+                {% else %}
+                <a class="material-icons adjusted" href="#">chevron_right</a>
+                {% endif %}
+                </div>
+
+          </div>
+           {% endif %}
         {% for file in files %}
             <div class="file">
                 {% if file.type == 'image' %}
@@ -66,10 +98,42 @@
                <!-- <div>{{ file.name | truncate(15) }}</div> -->
             </div>
         {% endfor %}
-</div>
+          {% if total_images > 0 %}
+          <div class="navi bottom">
+              <div class="pagination">
+                  <!-- previous button -->
+                  {% if prev_url %}
+                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 10)) }}">chevron_left</a>
+                  {% else %}
+                  <a class="material-icons adjusted" href="#">chevron_left</a>
+                  {% endif %}
+
+
+                <!-- Page Numbers -->
+                {% for page_number in page_numbers %}
+                {% if page_number == current_page %}
+                <a class="active" href="#">{{ page_number }}</a>
+                {% else %}
+                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 10)) }}">{{ page_number }}</a>
+                {% endif %}
+                {% endfor %}
+
+                  <!-- Next Button -->
+                {% if next_url %}
+                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 10)) }}">chevron_right</a>
+                {% else %}
+                <a class="material-icons adjusted" href="#">chevron_right</a>
+                {% endif %}
+                </div>
+          </div>
+          {% endif %}
+      </div>
   </div>
   </div>
   <div class="footer">
+       <!-- NAVIGATION -->
+
+
       <p class="centered">DDG is distributed under an Open Source license (gplv2). Please fork me on <a href="https://github.com/incama/DDG" title="Incama on Github">Github.com</a></p>
   </div>
     <script>
