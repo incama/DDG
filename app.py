@@ -3,7 +3,7 @@ import os
 import subprocess
 from math import ceil
 import logging
-from flask import Flask, render_template, url_for, send_from_directory, abort, request
+from flask import Flask, render_template, url_for, send_from_directory, abort, request, redirect, flash
 from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
 from config import (
@@ -12,7 +12,7 @@ from config import (
     APP_HOST, APP_PORT, APP_THREADS, ENABLE_DEBUG_MODE, LOGGING_LEVEL, DEFAULT_LIMIT
 )
 app = Flask(__name__)
-
+app.secret_key = "pdsg0A84CSioIDQ3zYkCwNd4pORQ9Hrh"  # Required for flashing
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 THUMBNAIL_DIR.mkdir(parents=True, exist_ok=True)  # Ensure thumbnails dir exists
 thumbnail_cache = {}
@@ -132,7 +132,6 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timest
 
     except (FileNotFoundError, OSError, EnvironmentError) as e:
         print(f"Error generating video thumbnail for {video_path}: {e}")
-
 # def get_random_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
 #     folder_path = Path(folder_path)
 #
@@ -360,6 +359,7 @@ def get_folder_content(current_path, page=1, limit=DEFAULT_LIMIT):
                 # Build file and thumbnail URLs
                 content["files"].append({
                     "type": "image",
+                    "name": file.name,
                     "path": url_for("gallery_file", filepath=str(file.relative_to(BASE_DIR).as_posix())),
                     "thumbnail": url_for("static", filename=f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"),
                 })
@@ -531,10 +531,6 @@ def static_files(filename):
 def block_static_folder_listing():
     # Blocks listing of the /static/ directory
     abort(403)
-
-# Run if waitress is acting up or for development
-# if __name__ == "__main__":
-#     app.run(host="0.0.0.0", port=5000, debug=False)
 
 if __name__ == "__main__":
     from waitress import serve
