@@ -1,65 +1,44 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="utf-8">
-    <link href="{{ url_for('static', filename='styles/reset.css') }}" rel="stylesheet">
-    <link href="{{ url_for('static', filename='styles/style.css') }}" rel="stylesheet">
-    <link href="https://fonts.googleapis.com" rel="preconnect">
-    <link crossorigin href="https://fonts.gstatic.com" rel="preconnect">
-    <!-- <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet"> -->
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
-    <link href="{{ url_for('static', filename='styles/lightbox.min.css') }}" rel="stylesheet">
-    <script src="{{ url_for('static', filename='js/lightbox-plus-jquery.min.js') }}"></script>
-    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}" type="image/x-icon">
-    <title>DDG | Directory Driven Gallery</title>
-    <meta content="width=device-width, initial-scale=1" name="viewport">
-    <meta content="en" http-equiv="content-language">
-    <meta content="index, follow" name="robots">
+  <meta charset="utf-8">
+  <title></title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/reset.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='css/style.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='css/lightbox.min.css') }}" rel="stylesheet">
+  <script src="{{ url_for('static', filename='js/lightbox-plus-jquery.min.js') }}"></script>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
 </head>
 <body>
-  <div class="header">
-      <a href="{{ url_for('gallery') }}"><img alt="IDDG" src="{{ url_for('static', filename='images/logo.png') }}" title="Incama's Directory Drive Galery" /></a>
-        <h1>Directory Driven Gallery</h1>
+<div class="top-wrapper">
+  <div class="logo"><img src="{{ url_for('static', filename='images/logo.png') }}"></div>
+  <div class="los"></div>
+  <div class="admin">
+      <div>
+    <button id="cleanup-thumbnails-button">Cleanup</button>
+</div>
   </div>
-    <div class="bread">
-      <div class="breadcrumb"><span class="material-icons">home</span>
-        <a href="{{ url_for('gallery') }}">Home</a>
-        {% for i, crumb in enumerate(breadcrumb) %}
+</div>
+<div class="bread-wrapper">
+  <div class="bread">
+      <a href="{{ url_for('gallery') }}">Home</a>
+      {% for i, crumb in enumerate(breadcrumb) %}
             <span class="material-icons adjust" >chevron_right</span>
             <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb[:i+1])) }}">{{ crumb }}</a>
         {% endfor %}
-    </div>
+  {% if total_images > 0 %}<span class="filecount">( {{ total_images }} files)</span>{% endif %}
   </div>
-  <div class="container">
-  <div class="left-column">
-      <div class="left-box-title">
-          <h2 class="content_header">Folders:</h2>
-      </div>
-      <div class="folders">
-        {% for folder in folders %}
-            <div class="folder">
-                <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb + [folder.name])) }}" title="{{ folder.name }}">
-                    <img alt="{{ folder.name }}" src="{{ folder.preview or url_for('static', filename='default_folder_thumb.png') }}">
-                </a>
-                <div class="folder_name">{{ folder.name | truncate(15) }}</div>
-            </div>
-        {% endfor %}
-    </div>
-  </div>
-
-          <!-- Files -->
-  <div class="content">
-      <div class="right-box-title">
-          <h2 class="content_header">Total Files in Directory #{{ total_images }}</h2>
-      </div>
-      <div class="files">
-          {% if total_images > 0 %}
-          <div class="navi">
+</div>
+{% if total_images > 0 %}
+<div class="navi">
               <div class="pagination">
                   <!-- previous button -->
                   {% if prev_url %}
-                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 10)) }}">chevron_left</a>
+                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 100)) }}">chevron_left</a>
                   {% else %}
                   <a class="material-icons adjusted" href="#">chevron_left</a>
                   {% endif %}
@@ -70,40 +49,60 @@
                 {% if page_number == current_page %}
                 <a class="active" href="#">{{ page_number }}</a>
                 {% else %}
-                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 10)) }}">{{ page_number }}</a>
+                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 100)) }}">{{ page_number }}</a>
                 {% endif %}
                 {% endfor %}
 
                   <!-- Next Button -->
                 {% if next_url %}
-                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 10)) }}">chevron_right</a>
+                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 100)) }}">chevron_right</a>
                 {% else %}
                 <a class="material-icons adjusted" href="#">chevron_right</a>
                 {% endif %}
-                </div>
+              </div>
+</div>
+{% endif %}
 
-          </div>
-           {% endif %}
-        {% for file in files %}
-            <div class="file">
-                {% if file.type == 'image' %}
-                    <a data-lightbox="test" data-title="{{ file.name }}" href="{{ file.path }}">
-                        <img alt="{{ file.name }}" src="{{ file.thumbnail }}">
-                    </a>
-                {% elif file.type == 'video' %}
-                    <a href="{{ file.path }}">
-                        <img alt="{{ file.name }}" src="{{ file.thumbnail }}">
-                    </a>
-                {% endif %}
-               <!-- <div>{{ file.name | truncate(15) }}</div> -->
-            </div>
-        {% endfor %}
-          {% if total_images > 0 %}
-          <div class="navi bottom">
+
+<div class="gallery-container">
+<!-- FOLDERS -->
+    {% for folder in folders %}
+      <div class="image-wrapper">
+
+        <div class="image">
+            <img src="{{ url_for('static', filename='img/folder.png') }}" class="type">
+            <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb + [folder.name])) }}" title="{{ folder.name }}">
+            <img alt="{{ folder.name }}" src="{{ folder.preview or url_for('static', filename='default_folder_thumb.png') }}">
+            </a>
+        <div class="desc">{{ folder.name | truncate(15) }} {{ total_images }}</div>
+        </div>
+      </div>
+    {% endfor %}
+<!-- FILES -->
+    {% for file in files %}
+        <div class="image-wrapper">
+        <div class="image">
+            {% if file.type == 'image' %}
+            <img src="{{ url_for('static', filename='img/photo.png') }}" class="type">
+            <a data-lightbox="test" data-title="{{ file.name }}" href="{{ file.path }}"><img alt="{{ file.name }}" src="{{ file.thumbnail }}"></a>
+            {% elif file.type == 'video' %}
+             <img src="{{ url_for('static', filename='img/video.png') }}" class="type">
+            <a href="{{ file.path }}">
+            <img alt="{{ file.name }}" src="{{ file.thumbnail }}">
+            </a>
+            {% endif %}
+            <div class="desc">{{ file.name | truncate(25) }}</div>
+        </div>
+        </div>
+    {% endfor %}
+    <div class="clearfix"></div>
+</div>
+{% if total_images > 0 %}
+<div class="navi">
               <div class="pagination">
                   <!-- previous button -->
                   {% if prev_url %}
-                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 10)) }}">chevron_left</a>
+                  <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page-1, limit=request.args.get('limit', 100)) }}">chevron_left</a>
                   {% else %}
                   <a class="material-icons adjusted" href="#">chevron_left</a>
                   {% endif %}
@@ -114,37 +113,19 @@
                 {% if page_number == current_page %}
                 <a class="active" href="#">{{ page_number }}</a>
                 {% else %}
-                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 10)) }}">{{ page_number }}</a>
+                <a href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=page_number, limit=request.args.get('limit', 100)) }}">{{ page_number }}</a>
                 {% endif %}
                 {% endfor %}
 
                   <!-- Next Button -->
                 {% if next_url %}
-                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 10)) }}">chevron_right</a>
+                <a class="material-icons adjusted" href="{{ url_for(breadcrumb and 'subgallery' or 'gallery', subpath='/'.join(breadcrumb) if breadcrumb else None, page=current_page+1, limit=request.args.get('limit', 100)) }}">chevron_right</a>
                 {% else %}
                 <a class="material-icons adjusted" href="#">chevron_right</a>
                 {% endif %}
-                </div>
-          </div>
-          {% endif %}
-      </div>
-  </div>
-  </div>
-  <div class="footer">
-       <!-- NAVIGATION -->
-
-
-      <p class="centered">DDG is distributed under an Open Source license (gplv2). Please fork me on <a href="https://github.com/incama/DDG" title="Incama on Github">Github.com</a></p>
-  </div>
-    <script>
-       document.addEventListener("DOMContentLoaded", function() {
-           if (typeof lightbox !== 'undefined') {
-               lightbox.init(); // Initialize Lightbox manually
-           } else {
-               console.error("Lightbox script not loaded or defined.");
-           }
-       });
-   </script>
+              </div>
+</div>
+{% endif %}
 <script>
     document.getElementById("cleanup-thumbnails-button").addEventListener("click", function () {
         if (confirm("Are you sure you want to clean up unused thumbnails?")) {
@@ -165,5 +146,6 @@
         }
     });
 </script>
+
 </body>
 </html>
