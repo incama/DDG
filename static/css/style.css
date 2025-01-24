@@ -16,7 +16,7 @@ body   {
     display: grid;
     grid-template-columns: 100px 1fr 100px;
     padding: 10px;
-    border-top: 5px solid #181416;
+    border-top: 5px solid #303030;
     border-bottom: 1px solid #B6B6B6;
 }
 .bread-wrapper{

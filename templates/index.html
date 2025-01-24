@@ -30,7 +30,7 @@
             <span class="material-icons adjust" >chevron_right</span>
             <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb[:i+1])) }}">{{ crumb }}</a>
         {% endfor %}
-  {% if total_images > 0 %}<span class="filecount">( {{ total_images }} files)</span>{% endif %}
+  {% if total_images > 0 %}<span class="filecount">({{ total_images }} files)</span>{% endif %}
   </div>
 </div>
 {% if total_images > 0 %}
