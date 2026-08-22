@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Generating Thumbnails - DDG</title>
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Kanit:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&family=Roboto:ital,wght@0,100..900;1,100..900&family=Spectral:ital,wght@0,200;0,300;0,400;0,500;0,600;0,700;0,800;1,200;1,300;1,400;1,500;1,600;1,700;1,800&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='css/reset.css') }}" rel="stylesheet" />
+  <link href="{{ url_for('static', filename='css/style.css') }}?v=1.3" rel="stylesheet" />
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico') }}" type="image/x-icon">
+</head>
+<body>
+<div class="top-wrapper">
+  <div class="logo"><img src="{{ url_for('static', filename='img/logo.png') }}"></div>
+  <div class="los"></div>
+  <div class="admin">
+    <div>
+      <button id="cleanup-thumbnails-button">Cleanup</button>
+    </div>
+  </div>
+</div>
+<div class="bread-wrapper">
+  <div class="bread">
+      <a href="{{ url_for('gallery') }}">Home</a>
+      {% for i, crumb in enumerate(breadcrumb) %}
+            <span class="material-icons adjust">chevron_right</span>
+            <a href="{{ url_for('subgallery', subpath='/'.join(breadcrumb[:i+1])) }}">{{ crumb }}</a>
+      {% endfor %}
+      {% if total_images > 0 %}<span class="filecount">({{ total_images }} files)</span>{% endif %}
+  </div>
+</div>
+
+<div class="loading-wrapper">
+  <div class="loading-card">
+    <div class="loading-spinner"></div>
+    <div class="loading-title">Generating Thumbnails</div>
+    <div id="loading-status" class="loading-status">Preparing {{ total_thumbnails }} thumbnail{% if total_thumbnails != 1 %}s{% endif %}...</div>
+    <div class="progress-track">
+      <div id="progress-fill" class="progress-fill"></div>
+    </div>
+    <div class="progress-info">
+      <span id="progress-count">0 / {{ total_thumbnails }}</span>
+      <span id="progress-percent">0%</span>
+    </div>
+    <div id="progress-file" class="progress-file">Starting thumbnail generation...</div>
+  </div>
+</div>
+
+<script>
+    document.getElementById("cleanup-thumbnails-button").addEventListener("click", function () {
+        if (confirm("Are you sure you want to clean up unused thumbnails?")) {
+            fetch("{{ url_for('cleanup_thumbnails_route') }}", {
+                method: "POST",
+            })
+            .then(response => {
+                if (response.ok) {
+                    alert("Thumbnail cleanup completed successfully!");
+                    window.location.reload();
+                } else {
+                    alert("Failed to cleanup thumbnails. Please try again.");
+                }
+            })
+            .catch(error => {
+                console.error("Error during thumbnail cleanup:", error);
+                alert("An error occurred. Please check the logs.");
+            });
+        }
+    });
+
+    (function() {
+        const subpath = {{ subpath | tojson }};
+        const page = {{ page | tojson }};
+        const limit = {{ limit | tojson }};
+        const totalThumbnails = {{ total_thumbnails | tojson }};
+
+        const progressFill = document.getElementById("progress-fill");
+        const progressPercent = document.getElementById("progress-percent");
+        const progressCount = document.getElementById("progress-count");
+        const loadingStatus = document.getElementById("loading-status");
+        const progressFile = document.getElementById("progress-file");
+
+        const apiUrl = `{{ url_for('api_generate_thumbnails') }}?subpath=${encodeURIComponent(subpath)}&page=${page}&limit=${limit}`;
+        let completed = false;
+
+        const eventSource = new EventSource(apiUrl);
+
+        eventSource.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.status === "progress") {
+                    const percent = data.percent;
+                    progressFill.style.width = percent + "%";
+                    progressPercent.textContent = percent + "%";
+                    progressCount.textContent = `${data.current} / ${data.total}`;
+                    loadingStatus.textContent = `Generating thumbnail ${data.current} of ${data.total}...`;
+                    if (data.filename) {
+                        progressFile.textContent = data.filename;
+                    }
+                } else if (data.status === "complete") {
+                    completed = true;
+                    progressFill.style.width = "100%";
+                    progressPercent.textContent = "100%";
+                    progressCount.textContent = `${data.total || totalThumbnails} / ${data.total || totalThumbnails}`;
+                    loadingStatus.textContent = "Thumbnails generated! Loading gallery...";
+                    progressFile.textContent = "Complete!";
+                    eventSource.close();
+                    setTimeout(function() {
+                        window.location.reload();
+                    }, 300);
+                }
+            } catch (e) {
+                console.error("Error parsing progress data:", e);
+            }
+        };
+
+        eventSource.onerror = function(err) {
+            console.error("EventSource connection error:", err);
+            eventSource.close();
+            if (!completed) {
+                setTimeout(function() {
+                    window.location.reload();
+                }, 1500);
+            }
+        };
+    })();
+</script>
+</body>
+</html>

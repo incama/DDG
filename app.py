@@ -1,9 +1,10 @@
 import os
 # import random | maybe in the near future when performance isn't an issue
+import json
 import subprocess
 from math import ceil
 import logging
-from flask import Flask, render_template, url_for, send_from_directory, abort, request, redirect, flash
+from flask import Flask, render_template, url_for, send_from_directory, abort, request, redirect, flash, Response, stream_with_context, jsonify
 from PIL import Image, ImageFile, ImageOps
 from pathlib import Path
 from config import (
@@ -189,6 +190,87 @@ def generate_video_thumbnail(video_path, thumbnail_path, size=(200, 200), timest
 #     # Cache the generated thumbnail URL
 #     thumbnail_cache[folder_path] = thumbnail_url
 #     return thumbnail_url
+def get_folder_preview_file(folder_path: Path):
+    """
+    Find the first valid image or video file directly in the given folder to use as a preview.
+    """
+    folder_path = Path(folder_path)
+    if not folder_path.exists() or not folder_path.is_dir():
+        return None
+    valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".avi", ".mov"]
+    files = sorted([f for f in folder_path.iterdir() if f.is_file() and f.suffix.lower() in valid_extensions], key=lambda e: e.name)
+    if files:
+        return files[0]
+    return None
+
+def generate_single_thumbnail(file_path, thumbnail_path, size=THUMBNAIL_SIZE, quality=THUMBNAIL_QUALITY):
+    """
+    Generate a single thumbnail for an image or video file if not already existing.
+    """
+    file_path = Path(file_path)
+    thumbnail_path = Path(thumbnail_path)
+    if thumbnail_path.exists():
+        return thumbnail_path
+
+    thumbnail_path.parent.mkdir(parents=True, exist_ok=True)
+    ext = file_path.suffix.lower()
+    try:
+        if ext in [".mp4", ".avi", ".mov"]:
+            generate_video_thumbnail(file_path, thumbnail_path, size=size, timestamp=FFMPEG_FRAME_TIMESTAMP)
+        else:
+            generate_thumbnail(file_path, thumbnail_path, size=size, quality=quality)
+    except Exception as e:
+        logging.error(f"Error generating thumbnail for {file_path}: {e}")
+
+    # Fallback to avoid infinite generation loops if generation failed
+    if not thumbnail_path.exists():
+        logging.warning(f"Thumbnail not created for {file_path}; creating fallback placeholder.")
+        thumbnail_path.touch()
+
+    return thumbnail_path
+
+def get_missing_thumbnails(current_path: Path, page=1, limit=DEFAULT_LIMIT):
+    """
+    Identify missing thumbnails for subfolders and paginated files in the current path.
+    """
+    current_path = Path(current_path)
+    if not current_path.exists() or not current_path.is_dir():
+        return []
+
+    missing = []
+    valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4", ".avi", ".mov"]
+
+    try:
+        entries = sorted(current_path.iterdir(), key=lambda entry: entry.name)
+    except OSError as e:
+        logging.error(f"Error reading directory {current_path}: {e}")
+        return []
+
+    folders = [entry for entry in entries if entry.is_dir()]
+    files = [entry for entry in entries if entry.is_file() and entry.suffix.lower() in valid_extensions]
+
+    # Check missing preview thumbnails for subfolders
+    for folder in folders:
+        preview_file = get_folder_preview_file(folder)
+        if preview_file:
+            thumb_path = recreate_folder_structure(preview_file, BASE_DIR, THUMBNAIL_DIR)
+            thumb_path = Path(thumb_path).with_suffix(".jpg")
+            if not thumb_path.exists():
+                missing.append((preview_file, thumb_path, "folder_preview", f"Folder preview: {folder.name}"))
+
+    # Check missing thumbnails for files on the current page
+    start_idx = (page - 1) * limit
+    end_idx = start_idx + limit
+    paginated_files = files[start_idx:end_idx]
+
+    for file in paginated_files:
+        thumb_path = recreate_folder_structure(file, BASE_DIR, THUMBNAIL_DIR)
+        thumb_path = Path(thumb_path).with_suffix(".jpg")
+        if not thumb_path.exists():
+            missing.append((file, thumb_path, "file", file.name))
+
+    return missing
+
 def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background_color=(186, 193, 185)):
     """
     Generate a preview for a folder using the first valid image/video file found in the folder.
@@ -200,13 +282,8 @@ def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background
         logging.warning(f"Folder {folder_path} does not exist.")
         return url_for("static", filename="default_folder_thumb.png")
 
-    # Gather all valid image/video files in the folder and sort them
-    valid_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp", ".mp4"]
-    files = sorted([f for f in folder_path.iterdir() if f.suffix.lower() in valid_extensions])
-    logging.debug(f"Sorted files in folder {folder_path}: {files}")
-
-    # Check if there are no valid files
-    if not files:
+    first_file = get_folder_preview_file(folder_path)
+    if not first_file:
         logging.info(f"No valid image/video files found in folder {folder_path}. Using fallback thumbnail.")
         fallback = THUMBNAIL_DIR / "default_folder_thumb.png"
         if not fallback.exists():
@@ -214,8 +291,6 @@ def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background
             logging.debug(f"Created an empty fallback file at {fallback}")
         return url_for("static", filename="default_folder_thumb.png")
 
-    # Use the first file as the preview
-    first_file = files[0]
     logging.info(f"Using the first file as thumbnail: {first_file}")
 
     # Generate a thumbnail path
@@ -225,13 +300,7 @@ def get_first_preview(folder_path: Path, size=(200, 200), quality=95, background
     # Generate the thumbnail if it doesn't already exist
     if not Path(thumbnail_path).exists():
         logging.info(f"Thumbnail not found, generating: {thumbnail_path}")
-        generate_thumbnail(
-            first_file,
-            thumbnail_path,
-            size=size,
-            quality=quality,
-            # background_color=background_color,
-        )
+        generate_single_thumbnail(first_file, thumbnail_path, size=size, quality=quality)
 
     # Return the relative thumbnail path for URLs
     relative_url = f"thumbnails/{Path(thumbnail_path).relative_to(THUMBNAIL_DIR).as_posix()}"
@@ -389,6 +458,50 @@ def get_folder_content(current_path, page=1, limit=DEFAULT_LIMIT):
 @app.template_filter('truncate')
 def truncate_filter(s, max_length=15):
     return s[:max_length] + "..." if len(s) > max_length else s
+
+@app.route("/api/generate-thumbnails")
+def api_generate_thumbnails():
+    """Server-Sent Events endpoint to stream thumbnail generation progress."""
+    subpath = request.args.get("subpath", "").strip("/\\")
+    try:
+        page = int(request.args.get("page", 1))
+    except (ValueError, TypeError):
+        page = 1
+    try:
+        limit = int(request.args.get("limit", DEFAULT_LIMIT))
+    except (ValueError, TypeError):
+        limit = DEFAULT_LIMIT
+
+    if subpath:
+        target_path = (BASE_DIR / subpath).resolve()
+        if not str(target_path).startswith(str(BASE_DIR.resolve())):
+            return jsonify({"error": "Invalid path"}), 400
+    else:
+        target_path = BASE_DIR.resolve()
+
+    if not target_path.exists() or not target_path.is_dir():
+        return jsonify({"error": "Directory not found"}), 404
+
+    def generate_stream():
+        missing = get_missing_thumbnails(target_path, page=page, limit=limit)
+        total = len(missing)
+        if total == 0:
+            yield f"data: {json.dumps({'status': 'complete', 'current': 0, 'total': 0, 'percent': 100})}\n\n"
+            return
+
+        for idx, (src_file, thumb_path, item_type, label) in enumerate(missing, 1):
+            try:
+                generate_single_thumbnail(src_file, thumb_path)
+            except Exception as e:
+                logging.error(f"Error generating thumbnail for {src_file}: {e}")
+
+            percent = int((idx / total) * 100)
+            yield f"data: {json.dumps({'status': 'progress', 'current': idx, 'total': total, 'percent': percent, 'filename': label})}\n\n"
+
+        yield f"data: {json.dumps({'status': 'complete', 'current': total, 'total': total, 'percent': 100})}\n\n"
+
+    return Response(stream_with_context(generate_stream()), mimetype="text/event-stream")
+
 @app.route("/")
 def gallery():
     """Main gallery landing page with pagination."""
@@ -403,6 +516,19 @@ def gallery():
 
         if total_images == 0:
             logging.warning("No images found in the directory.")
+
+        missing = get_missing_thumbnails(BASE_DIR, page=page, limit=limit)
+        if missing:
+            return render_template(
+                "loading.html",
+                breadcrumb=[],
+                total_images=total_images,
+                subpath="",
+                page=page,
+                limit=limit,
+                total_thumbnails=len(missing),
+                enumerate=enumerate,
+            )
 
         content = get_folder_content(BASE_DIR, page=page, limit=limit)
 
@@ -441,6 +567,7 @@ def gallery():
     except Exception as e:
         logging.exception("Error in gallery function")
         return "An error occurred. Please check the logs.", 500
+
 @app.route("/<path:subpath>/")
 def subgallery(subpath):
     """Dynamic subgallery with pagination."""
@@ -460,14 +587,28 @@ def subgallery(subpath):
         logging.debug(f"Pagination parameters: page={page}, limit={limit}")
 
         # Fetch total images and folder contents
-        total_images = count_images_in_directory(current_path)
+        total_images = count_images_in_directory(Path(current_path))
         logging.debug(f"Total images in current_path='{current_path}': {total_images}")
-        content = get_folder_content(current_path, page=page, limit=limit)
 
         # Breadcrumb and parent path for navigation
         breadcrumb = subpath.split("/") if subpath else []
         logging.debug(f"Breadcrumb: {breadcrumb}")
         parent_path = "/".join(breadcrumb[:-1]) if breadcrumb else None
+
+        missing = get_missing_thumbnails(Path(current_path), page=page, limit=limit)
+        if missing:
+            return render_template(
+                "loading.html",
+                breadcrumb=breadcrumb,
+                total_images=total_images,
+                subpath=subpath,
+                page=page,
+                limit=limit,
+                total_thumbnails=len(missing),
+                enumerate=enumerate,
+            )
+
+        content = get_folder_content(current_path, page=page, limit=limit)
 
         # Calculate total pages
         total_pages = max(1, ceil(total_images / limit))  # Ensure at least 1 page
