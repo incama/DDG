@@ -9,6 +9,9 @@ body   {
 }
 
 .top-wrapper {
+    position: sticky;
+    top: 0;
+    z-index: 1000;
     background-image: url("../img/top-bg.png");
     background-position: 20% 80%;
     background-color: #2A2A2A;
