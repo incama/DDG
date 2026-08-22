@@ -24,6 +24,10 @@ body   {
     border-bottom: 1px solid #B6B6B6;
 }
 .bread-wrapper{
+    position: -webkit-sticky;
+    position: sticky;
+    top: 81px;
+    z-index: 999;
     background: #303030;
     padding: 18px 10px 10px 30px;
     /* box-shadow: 0 0px 50px 0px #000; */
